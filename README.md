@@ -153,3 +153,12 @@ your scores, so only do this on a network you trust.
 - **Serial: "Cannot open ..."** - another program (or a second copy of this one) has the port, or the adapter driver isn't installed.
 - **Serial connected but no frames** - set the frame length; check baud rate; try a null-modem adapter.
 - **Start fresh** - run with `--reset`, or delete the `data` folder.
+
+## Screenshots
+  
+- <img width="1400" height="900" alt="IMG_6551" src="https://github.com/user-attachments/assets/77e76488-bea1-4e0b-83ac-8536020b5196" />
+<img width="1400" height="900" alt="IMG_6550" src="https://github.com/user-attachments/assets/bb4486e6-2a22-4fe0-a883-f2027979a085" />
+<img width="1400" height="900" alt="IMG_6549" src="https://github.com/user-attachments/assets/19905d71-490d-464b-8179-436b7fa27c67" />
+<img width="1400" height="900" alt="IMG_6548" src="https://github.com/user-attachments/assets/4835bf6c-0861-4151-a75b-67970fdc0bbf" />
+<img width="1250" height="1320" alt="IMG_6547" src="https://github.com/user-attachments/assets/089eb712-5f4b-4775-9b8e-ff7f8d3ae1d8" />
+
