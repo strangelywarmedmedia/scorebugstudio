@@ -1,0 +1,19 @@
+{
+  "serial": {
+    "port": "",
+    "baud": 9600,
+    "bytesize": 8,
+    "parity": "N",
+    "stopbits": 1
+  },
+  "protocol": {
+    "frame_length": null,
+    "start_marker": null,
+    "fields": {}
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "http_port": 8000,
+    "ws_port": 8765
+  }
+}
