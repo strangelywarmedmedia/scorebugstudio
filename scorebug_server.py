@@ -16,9 +16,11 @@ OBS:   Browser Source -> http://localhost:8000/overlay.html  (1920 x 1080)
 import argparse
 import asyncio
 import copy
+import ipaddress
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -37,7 +39,7 @@ try:
 except ImportError:
     sys.exit("Missing dependency. Install with: pip install websockets pyserial")
 
-VERSION = "2.0"
+VERSION = "2.1.0"
 
 # --------------------------------------------------------------------------
 # Defaults
@@ -55,7 +57,7 @@ SPORTS = {
 DEFAULT_CONFIG = {
     "serial": {"port": "", "baud": 9600, "bytesize": 8, "parity": "N", "stopbits": 1},
     "protocol": {"frame_length": None, "start_marker": None, "fields": {}},
-    "server": {"host": "127.0.0.1", "http_port": 8000, "ws_port": 8765},
+    "server": {"host": "127.0.0.1", "http_port": 8000, "ws_port": 8765, "allow_network": None},
 }
 
 # (config field name, label shown in the control panel)
@@ -337,12 +339,35 @@ class SerialBridge:
 # --------------------------------------------------------------------------
 # App
 # --------------------------------------------------------------------------
-def app_dir():
-    """Folder holding config/, web/ and data/. Next to the executable when
+def resource_dir():
+    """Read-only files that ship with the app (the web/ folder). Inside the bundle when
     frozen with PyInstaller, otherwise next to this script."""
     if getattr(sys, "frozen", False):
-        return os.path.dirname(os.path.abspath(sys.executable))
+        return getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def user_dir():
+    """Folder for settings and saved data (config, data/). The installed app keeps these in
+    the normal per-user location so updates never overwrite them; run from source it is the
+    script's own folder. Set SCOREBUG_DATA_DIR to put it somewhere else."""
+    env = os.environ.get("SCOREBUG_DATA_DIR")
+    if env:
+        return os.path.abspath(env)
+    if not getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(__file__))
+    home = os.path.expanduser("~")
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or os.path.join(home, "AppData", "Roaming")
+    elif sys.platform == "darwin":
+        base = os.path.join(home, "Library", "Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.join(home, ".local", "share")
+    return os.path.join(base, "ScorebugStudio")
+
+
+def app_dir():
+    return user_dir()
 
 
 def now_ms():
@@ -360,6 +385,7 @@ class App:
         self.library = self.load_library()
         self.clients = set()
         self.loop = None
+        self.allow_network = False
         self.dirty = False
         self.bridge = SerialBridge(self)
         self.serial_status = {"state": "idle", "message": "", "bytes": 0, "frames": 0,
@@ -381,7 +407,32 @@ class App:
             print(f"Warning: could not read {self.config_path}: {e}")
         return cfg
 
+    def _init_network(self):
+        scfg = self.cfg["server"]
+        allow = scfg.get("allow_network")
+        if allow is None:  # older config: "host": "0.0.0.0" meant 'allow other devices'
+            allow = scfg.get("host", "127.0.0.1") not in ("127.0.0.1", "localhost", "::1")
+        self.allow_network = bool(allow)
+
+    def set_allow_network(self, enabled):
+        self.allow_network = bool(enabled)
+        self.cfg["server"]["allow_network"] = self.allow_network
+        try:
+            self.save_config()
+        except Exception as e:
+            print("Warning: could not save settings:", e)
+        if not self.allow_network and self.loop:  # drop devices that are already connected
+            for c in list(self.clients):
+                try:
+                    peer = c.remote_address[0]
+                except Exception:
+                    continue
+                if not is_local_addr(peer):
+                    asyncio.run_coroutine_threadsafe(c.close(1008, "other devices are not allowed"), self.loop)
+        print("Other devices on your network are now", "ALLOWED" if self.allow_network else "blocked")
+
     def save_config(self):
+        os.makedirs(os.path.dirname(os.path.abspath(self.config_path)), exist_ok=True)
         out = {k: self.cfg[k] for k in ("serial", "protocol", "server")}
         with open(self.config_path, "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2)
@@ -825,6 +876,13 @@ class App:
 
     # ---- websocket ------------------------------------------------------
     async def ws_handler(self, ws, path=None):
+        try:
+            peer = ws.remote_address[0]
+        except Exception:
+            peer = "127.0.0.1"
+        if not self.allow_network and not is_local_addr(peer):
+            await ws.close(1008, "other devices are not allowed")
+            return
         self.clients.add(ws)
         try:
             await ws.send(json.dumps({"type": "state", "t": int(now_ms()), "state": self.state}))
@@ -887,7 +945,45 @@ STORE_NAME = re.compile(r"^[A-Za-z0-9_.\-]{1,80}$")
 STORE_MAX = 16 * 1024 * 1024
 
 
-def make_handler(web_dir, ws_port, data_dir=None):
+def is_local_addr(addr):
+    """True for connections coming from this computer itself."""
+    try:
+        ip = ipaddress.ip_address(str(addr).split("%")[0])
+    except ValueError:
+        return False
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return ip.is_loopback
+
+
+def lan_addresses():
+    """This computer's private network (LAN) IPv4 addresses, the most likely one first."""
+    found = []
+    try:  # the address used to reach the outside world (no packet is actually sent)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.2)
+        s.connect(("10.255.255.255", 1))
+        found.append(s.getsockname()[0])
+        s.close()
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.append(info[4][0])
+    except Exception:
+        pass
+    out = []
+    for a in found:
+        try:
+            ip = ipaddress.ip_address(a)
+        except ValueError:
+            continue
+        if ip.is_private and not ip.is_loopback and not ip.is_link_local and a not in out:
+            out.append(a)
+    return out
+
+
+def make_handler(web_dir, ws_port, data_dir=None, app=None):
     store_dir = os.path.join(data_dir, "stats") if data_dir else None
     if store_dir:
         os.makedirs(store_dir, exist_ok=True)
@@ -907,8 +1003,51 @@ def make_handler(web_dir, ws_port, data_dir=None):
             self.send_header("Cache-Control", "no-store")
             super().end_headers()
 
-        def do_GET(self):
+        def _blocked(self):
+            """Other devices are refused unless 'Allow other devices' is on (Style tab)."""
+            if app is None or app.allow_network or is_local_addr(self.client_address[0]):
+                return False
+            body = (b"<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
+                    b"<body style='font-family:sans-serif;background:#0f1319;color:#fff;padding:32px'>"
+                    b"<h2>Scorebug Studio</h2><p>Other devices are not allowed yet.</p>"
+                    b"<p>On the computer running Scorebug Studio open <b>Style</b> and turn on "
+                    b"<b>Allow other devices</b>, then reload this page.</p>")
+            self.send_response(403)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return True
+
+        def _network(self, method):
+            local = is_local_addr(self.client_address[0])
+            if method == "POST":
+                if not local:
+                    return self._json(403, {"error": "only the computer running Scorebug Studio can change this"})
+                try:
+                    n = int(self.headers.get("Content-Length") or 0)
+                    data = json.loads(self.rfile.read(n) or b"{}")
+                except ValueError:
+                    return self._json(400, {"error": "bad request"})
+                app.set_allow_network(bool(data.get("enabled")))
+            scfg = app.cfg["server"]
+            return self._json(200, {"enabled": app.allow_network, "local": local, "ips": lan_addresses(),
+                                    "httpPort": scfg["http_port"], "wsPort": scfg["ws_port"]})
+
+        def do_POST(self):
+            if self._blocked():
+                return
             path = self.path.split("?")[0]
+            if path == "/api/network" and app is not None:
+                return self._network("POST")
+            self._json(404, {"error": "not found"})
+
+        def do_GET(self):
+            if self._blocked():
+                return
+            path = self.path.split("?")[0]
+            if path == "/api/network" and app is not None:
+                return self._network("GET")
             if path in ("", "/"):
                 self.send_response(302)
                 self.send_header("Location", "/control.html")
@@ -978,12 +1117,16 @@ def make_handler(web_dir, ws_port, data_dir=None):
                 self._json(200, {"ok": True})
 
         def do_PUT(self):
+            if self._blocked():
+                return
             path = self.path.split("?")[0]
             if path.startswith("/api/store/"):
                 return self._store("PUT", path)
             self._json(404, {"error": "not found"})
 
         def do_DELETE(self):
+            if self._blocked():
+                return
             path = self.path.split("?")[0]
             if path.startswith("/api/store/"):
                 return self._store("DELETE", path)
@@ -994,20 +1137,24 @@ def make_handler(web_dir, ws_port, data_dir=None):
 async def amain(app, args):
     app.loop = asyncio.get_running_loop()
     scfg = app.cfg["server"]
-    web_dir = os.path.join(app.base_dir, "web")
+    app._init_network()
+    # Always listen on the network so the Style tab switch can turn sharing on without a restart;
+    # devices other than this computer are refused until 'Allow other devices' is on.
+    bind = scfg["host"] if scfg["host"] not in ("127.0.0.1", "localhost") else "0.0.0.0"
+    web_dir = os.path.join(resource_dir(), "web")
     if not os.path.isdir(web_dir):
-        raise SystemExit(f"Cannot find the 'web' folder next to the app ({web_dir}).")
+        raise SystemExit(f"Cannot find the 'web' folder ({web_dir}).")
 
     try:
-        httpd = ThreadingHTTPServer((scfg["host"], scfg["http_port"]),
-                                    make_handler(web_dir, scfg["ws_port"], app.data_dir))
+        httpd = ThreadingHTTPServer((bind, scfg["http_port"]),
+                                    make_handler(web_dir, scfg["ws_port"], app.data_dir, app))
     except OSError as e:
         raise SystemExit(f"Cannot start web server on port {scfg['http_port']}: {e}\n"
                          "Is another copy of Scorebug Studio already running?")
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
     try:
-        await websockets.serve(app.ws_handler, scfg["host"], scfg["ws_port"], max_size=16 * 1024 * 1024)
+        await websockets.serve(app.ws_handler, bind, scfg["ws_port"], max_size=16 * 1024 * 1024)
     except OSError as e:
         raise SystemExit(f"Cannot start WebSocket server on port {scfg['ws_port']}: {e}")
 
@@ -1019,8 +1166,11 @@ async def amain(app, args):
     print(f"Scorebug Studio {VERSION}")
     print(f"  Control panel : {base}/control.html")
     print(f"  OBS overlay   : {base}/overlay.html   (Browser Source, 1920 x 1080)")
-    if scfg["host"] != "127.0.0.1" and scfg["host"] != "localhost":
-        print(f"  Listening on {scfg['host']} - other devices on your network can open the control panel.")
+    if app.allow_network:
+        ips = lan_addresses()
+        print("  Other devices (iPad etc.) are ALLOWED" + (f": http://{ips[0]}:{scfg['http_port']}/stats.html" if ips else "."))
+    else:
+        print("  Other devices (iPad etc.) are off - turn them on in the Style tab.")
     print("Leave this window open during the broadcast. Press Ctrl+C to quit.")
     if not args.no_browser:
         try:

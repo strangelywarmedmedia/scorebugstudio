@@ -10,21 +10,35 @@ both - the scoreboard can drive some fields while you control the rest by hand.
                                             +-- manual input ---/
 ```
 
-## Quick start
+## Install
 
-1. Install Python 3 and the two libraries: `pip install pyserial websockets`
-2. Run `python3 scorebug_server.py` (Windows: `python scorebug_server.py`).
-   The control panel opens in your browser at **http://localhost:8000/control.html**.
-3. In OBS add a **Browser Source**:
-   - URL: `http://localhost:8000/overlay.html`
-   - Width **1920**, Height **1080** (any 16:9 size works - the overlay scales itself)
-   - Leave "Shutdown source when not visible" **unchecked**
-   - Needs OBS 28 or newer.
+**Windows:** download `ScorebugStudio-Setup-<version>.exe` from the repository's **Releases** page and run it.
+Windows SmartScreen may say "Windows protected your PC" (the installer isn't code-signed yet): click **More info**, then **Run anyway**.
+Scorebug Studio appears in the Start Menu, with an optional desktop shortcut and an option to start when you sign in.
+The first time it starts, Windows Firewall asks about network access: tick **Private networks** and **Allow access** (needed only if you want to use an iPad).
 
-Prefer a double-clickable app? Run `build_mac.sh` (on the Mac) or `build_windows.bat` (on the Windows PC).
-Each builds a folder containing the app, `web/` and `scorebug_config.json`. Keep those three together.
-First launch: macOS - right-click the app, Open, Open. Windows - SmartScreen, More info, Run anyway
-(the app isn't code-signed).
+**Mac:** download the `.dmg` that matches your Mac from **Releases** - `arm64` for Apple Silicon (M1, M2, M3, M4), `intel` for older Intel Macs (Apple menu -> About This Mac shows which). Open it and drag **Scorebug Studio** onto **Applications**.
+The app isn't notarized by Apple yet, so the first launch needs one extra step:
+1. Open **Applications** and double-click **Scorebug Studio**. macOS says it can't be verified - click **Done**.
+2. Open **System Settings -> Privacy & Security**, scroll down, and click **Open Anyway** next to Scorebug Studio, then **Open** and enter your password.
+After that it opens normally. (If you prefer Terminal: `xattr -dr com.apple.quarantine "/Applications/Scorebug Studio.app"`.)
+
+**Using it:** Scorebug Studio runs in the background with an icon in the Windows system tray (bottom right, maybe under the ^ arrow) or the Mac menu bar (top right). Click the icon for **Open control panel**, **Open Stat Keeper**, **Copy OBS overlay link**, **Open data folder** and **Quit**. The control panel opens in your browser automatically each time you start it.
+Your teams, logos, settings and saved games are kept in your user folder (Windows: `%APPDATA%\ScorebugStudio`, Mac: `~/Library/Application Support/ScorebugStudio`; the tray menu's **Open data folder** takes you there), so installing a new version never erases them.
+**Updating:** download the newer installer and run it over the old one.
+
+### Add it to OBS
+In OBS add a **Browser Source**:
+- URL: `http://localhost:8000/overlay.html` (or use **Copy OBS overlay link** in the tray menu)
+- Width **1920**, Height **1080** (any 16:9 size works - the overlay scales itself)
+- Leave "Shutdown source when not visible" **unchecked**
+- Needs OBS 28 or newer.
+
+### Running from source (developers)
+1. Install Python 3.10 or newer, then `pip install -r requirements.txt`.
+2. `python scorebug_app.py` (tray icon) or `python scorebug_server.py` (plain server in a terminal window).
+   The control panel opens at **http://localhost:8000/control.html**.
+3. To build the installers yourself see `docs/RELEASING.md`.
 
 ## The control panel
 
@@ -49,6 +63,8 @@ click *Use as Home / Use as Away*. Text color adjusts automatically for readabil
 
 **Style tab** - starts with the **OBS output link** and a **Copy link** button (paste it into an OBS Browser Source). Then, per sport: position (6 anchors), size, nudge X/Y, panel and accent colors, full name vs
 abbreviation, home team on left or right. Football/basketball also: period length, timeouts per team, tenths.
+
+**Style tab also holds Other devices** - the switch, QR code and address for using the Stat Keeper or control panel from an iPad (see "Controlling from a tablet" below).
 
 **Scoreboard data tab** - see below.
 
@@ -127,10 +143,20 @@ Minutes and plus/minus come from substitutions against the game clock, so keep t
 
 ## Controlling from a tablet or second computer
 
-By default only this computer can reach the app. To allow other devices on your network, set
-`"host": "0.0.0.0"` under `server` in `scorebug_config.json`, restart, and open
-`http://<this-computer's-IP>:8000/control.html` on the other device. Anyone on that network can then change
-your scores, so only do this on a network you trust.
+Use the Stat Keeper or the control panel from an iPad, phone or another computer on the same Wi-Fi or network:
+
+1. On the computer running Scorebug Studio open **Style -> Other devices** and press **Allow other devices**.
+2. Choose **Stat Keeper** or **Control panel**. A QR code and the address appear (for example `http://192.168.1.25:8000/stats.html`).
+3. On the iPad, point the camera at the QR code and tap the link, or type the address into Safari.
+
+Turn it **off** again when you are done: while it is on, anyone on that network can open these pages and change your
+scores. The switch is remembered between launches and only the computer running Scorebug Studio can change it.
+Other devices that are already connected are disconnected the moment you turn it off.
+
+If the iPad can't connect: check that both devices are on the same Wi-Fi (not a guest network - those often block
+devices from seeing each other), and allow Scorebug Studio through the computer's firewall (Windows: tick **Private
+networks** in the firewall prompt). A page saying "Other devices are not allowed yet" means the switch is still off.
+Older setups that used `"host": "0.0.0.0"` in `scorebug_config.json` keep working.
 
 ## Files
 
@@ -139,26 +165,21 @@ your scores, so only do this on a network you trust.
 | `scorebug_server.py` | The server (state, clock, serial import, control + overlay hosting) |
 | `web/overlay.html` | The OBS overlay (all five sport templates) |
 | `web/control.html` | The control panel |
-| `web/stats.html` (+ `stats-app.js`, `stats-engine.js`, `roster-parse.js`, `vendor/`) | Stat keeper for all five sports; `vendor/` is pdf.js (Apache-2.0) for reading roster PDFs offline |
+| `web/stats.html` (+ `stats-app.js`, `stats-engine.js`, `roster-parse.js`, `vendor/`) | Stat keeper for all five sports; `vendor/` is pdf.js (Apache-2.0) for reading roster PDFs offline and a QR code generator (MIT) for the Other devices card |
 | `web/fonts/` | Barlow Condensed (SIL Open Font License), bundled so everything works offline |
 | `scorebug_config.json` | Serial port, field mapping, ports/host (the Data tab edits this for you) |
+| `CHANGELOG.md`, `CHANGELOG-streamdeck.md` | What changed in each version of the app and of the plugin |
 | `capture.py` | Command-line raw serial capture (optional) |
-| `build_mac.sh`, `build_windows.bat` | Build a standalone app |
-| `data/` | Created at run time: saved game state and saved teams |
+| `scorebug_app.py` | Desktop launcher: starts the server and shows the tray / menu-bar icon (what the installers run) |
+| `packaging/`, `.github/workflows/release.yml`, `docs/RELEASING.md` | Installer build scripts and the GitHub workflow that builds them |
+| `data/` | Run from source: saved game state and teams (the installed app keeps these in your user folder instead) |
 
 ## Troubleshooting
 
-- **Control panel shows a red dot / nothing updates** - the server isn't running, or another copy is using ports 8000/8765 (change them in the config).
+- **Control panel shows a red dot / nothing updates** - the server isn't running, or another copy is using ports 8000/8765 (change them in `scorebug_config.json`, in the data folder).
 - **OBS shows nothing** - the overlay is hidden (press SHOW), or the Browser Source URL is wrong. Right-click the source -> Refresh.
 - **Serial: "Cannot open ..."** - another program (or a second copy of this one) has the port, or the adapter driver isn't installed.
 - **Serial connected but no frames** - set the frame length; check baud rate; try a null-modem adapter.
-- **Start fresh** - run with `--reset`, or delete the `data` folder.
-
-## Screenshots
-  
-- <img width="1400" height="900" alt="IMG_6551" src="https://github.com/user-attachments/assets/77e76488-bea1-4e0b-83ac-8536020b5196" />
-<img width="1400" height="900" alt="IMG_6550" src="https://github.com/user-attachments/assets/bb4486e6-2a22-4fe0-a883-f2027979a085" />
-<img width="1400" height="900" alt="IMG_6549" src="https://github.com/user-attachments/assets/19905d71-490d-464b-8179-436b7fa27c67" />
-<img width="1400" height="900" alt="IMG_6548" src="https://github.com/user-attachments/assets/4835bf6c-0861-4151-a75b-67970fdc0bbf" />
-<img width="1250" height="1320" alt="IMG_6547" src="https://github.com/user-attachments/assets/089eb712-5f4b-4775-9b8e-ff7f8d3ae1d8" />
-
+- **iPad can't open the app** - turn on Style -> Other devices (see "Controlling from a tablet"), check the Wi-Fi network and the firewall.
+- **Start fresh** - run `python scorebug_app.py --reset`, or delete the `data` folder inside the data folder (tray menu -> Open data folder).
+- **Nothing happens when I start the app** - it may already be running (look for the tray / menu-bar icon); starting it again just opens the control panel. A log is kept in the data folder under `logs/scorebug.log`.

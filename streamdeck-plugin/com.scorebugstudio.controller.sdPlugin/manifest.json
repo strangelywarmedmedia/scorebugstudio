@@ -1,0 +1,252 @@
+{
+  "Name": "Scorebug Studio",
+  "Version": "1.2.0.0",
+  "Author": "BSPN",
+  "Actions": [
+    {
+      "Name": "Score",
+      "UUID": "com.scorebugstudio.controller.score",
+      "Icon": "imgs/actions/score/icon",
+      "Tooltip": "Add points for a team. Tap +N, hold -N.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/score/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Game Clock",
+      "UUID": "com.scorebugstudio.controller.clock",
+      "Icon": "imgs/actions/clock/icon",
+      "Tooltip": "Start/stop, adjust or reset the game clock.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/clock/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Show / Hide",
+      "UUID": "com.scorebugstudio.controller.visibility",
+      "Icon": "imgs/actions/visibility/icon",
+      "Tooltip": "Put the scorebug on or off air.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/visibility/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Banner",
+      "UUID": "com.scorebugstudio.controller.banner",
+      "Icon": "imgs/actions/banner/icon",
+      "Tooltip": "Pop a banner (touchdown, three pointer, goal...) under the scorebug in the generic or a team color.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/banner/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Period",
+      "UUID": "com.scorebugstudio.controller.period",
+      "Icon": "imgs/actions/period/icon",
+      "Tooltip": "Next period (hold for previous).",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/period/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Possession",
+      "UUID": "com.scorebugstudio.controller.possession",
+      "Icon": "imgs/actions/possession/icon",
+      "Tooltip": "Possession / serve indicator.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/possession/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Timeout",
+      "UUID": "com.scorebugstudio.controller.timeout",
+      "Icon": "imgs/actions/timeout/icon",
+      "Tooltip": "Use a timeout (hold to give one back).",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/timeout/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Counter",
+      "UUID": "com.scorebugstudio.controller.counter",
+      "Icon": "imgs/actions/counter/icon",
+      "Tooltip": "Down, distance, fouls, balls/strikes/outs, inning, sets.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/counter/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Base Runner",
+      "UUID": "com.scorebugstudio.controller.bases",
+      "Icon": "imgs/actions/bases/icon",
+      "Tooltip": "Toggle a runner on a base.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/bases/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Game Command",
+      "UUID": "com.scorebugstudio.controller.game",
+      "Icon": "imgs/actions/game/icon",
+      "Tooltip": "Next half-inning, end set, new game, swap teams, switch sport.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/game/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Period Label (HALF / OT)",
+      "UUID": "com.scorebugstudio.controller.periodlabel",
+      "Icon": "imgs/actions/periodlabel/icon",
+      "Tooltip": "Show HALF, OT or FINAL in place of the quarter. Tap again to go back.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/periodlabel/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Soccer Card",
+      "UUID": "com.scorebugstudio.controller.card",
+      "Icon": "imgs/actions/card/icon",
+      "Tooltip": "Yellow or red card for a team. Tap +1, hold -1.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/card/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    },
+    {
+      "Name": "Penalty Shootout",
+      "UUID": "com.scorebugstudio.controller.shootout",
+      "Icon": "imgs/actions/shootout/icon",
+      "Tooltip": "Soccer shootout: goal, miss, undo, show on scorebug.",
+      "PropertyInspectorPath": "ui/pi.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "imgs/actions/shootout/key",
+          "TitleAlignment": "middle",
+          "ShowTitle": false
+        }
+      ]
+    }
+  ],
+  "Category": "Scorebug Studio",
+  "CategoryIcon": "imgs/plugin/category-icon",
+  "CodePath": "bin/plugin.js",
+  "Description": "Control your Scorebug Studio overlay (football, basketball, baseball, volleyball, soccer) from the Stream Deck: scores, clock, period, timeouts, cards, shootouts, banners and more.",
+  "Icon": "imgs/plugin/marketplace",
+  "SDKVersion": 3,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Nodejs": {
+    "Version": "24",
+    "Debug": "enabled"
+  },
+  "UUID": "com.scorebugstudio.controller"
+}

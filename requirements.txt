@@ -1,0 +1,4 @@
+pyserial>=3.5
+websockets>=12
+pystray>=0.19.5
+pillow>=10

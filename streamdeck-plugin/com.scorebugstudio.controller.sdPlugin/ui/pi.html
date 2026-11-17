@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Scorebug Studio</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 10px 12px 16px; background: #2d2d2d; color: #d8d8d8; font: 13px/1.3 -apple-system, "Segoe UI", sans-serif; }
+  .row { display: flex; align-items: center; margin: 7px 0; }
+  .row > label { width: 92px; flex: none; color: #aaa; }
+  .row > :not(label) { flex: 1; min-width: 0; }
+  input, select { background: #1e1e1e; color: #eee; border: 1px solid #555; border-radius: 3px; padding: 5px 6px; font: inherit; }
+  input[type=color] { padding: 0; height: 28px; }
+  h4 { margin: 16px 0 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #888; border-top: 1px solid #444; padding-top: 10px; }
+  .hint { color: #888; font-size: 11px; margin: 2px 0 0 92px; }
+  #status { margin-left: 92px; font-size: 11px; color: #888; }
+  button { background: #444; color: #eee; border: 0; border-radius: 3px; padding: 5px 10px; font: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="fields"></div>
+<h4>Connection</h4>
+<div class="row"><label for="host">Scorebug host</label><input id="host" placeholder="127.0.0.1"></div>
+<div class="row"><label for="port">WebSocket port</label><input id="port" type="number" placeholder="8765"></div>
+<div class="hint">Same for all keys. Use the WebSocket port from scorebug_config.json (default 8765). Change the host only if Scorebug Studio runs on another computer.</div>
+<script>
+const SIDE = [["home", "Home"], ["away", "Away"]];
+const DEFS = {
+  score: [
+    { k: "side", t: "Team", o: SIDE, d: "home" },
+    { k: "delta", t: "Points", o: [["1", "+1"], ["2", "+2"], ["3", "+3"], ["6", "+6 (touchdown)"]], d: "1", hint: "Tap adds, hold subtracts." }
+  ],
+  clock: [
+    { k: "mode", t: "Function", d: "toggle", o: [["toggle", "Start / stop (shows time)"], ["start", "Start"], ["stop", "Stop"], ["add", "Add seconds"], ["sub", "Remove seconds"], ["reset", "Reset (hold)"], ["visible", "Show / hide clock on scorebug"]] },
+    { k: "seconds", t: "Seconds", type: "number", d: "1", show: s => s.mode === "add" || s.mode === "sub" },
+  ],
+  banner: [
+    { k: "preset", t: "Message", d: st => (st.text ? "custom" : "TOUCHDOWN {T}!"), hint: "Pick a ready-made banner, or Custom text.", o: [
+      ["TOUCHDOWN {T}!", "Football: Touchdown"], ["FIELD GOAL", "Football: Field goal"], ["EXTRA POINT GOOD", "Football: Extra point good"],
+      ["TWO-POINT CONVERSION", "Football: Two-point conversion"], ["INTERCEPTION!", "Football: Interception"], ["FUMBLE!", "Football: Fumble"],
+      ["SAFETY", "Football: Safety"], ["TURNOVER", "Football: Turnover"], ["FLAG ON THE PLAY", "Football: Flag on the play"],
+      ["THREE POINTER! {T}", "Basketball: Three pointer"], ["DUNK! {T}", "Basketball: Dunk"], ["BONUS: {T}", "Basketball: Bonus"], ["FOUL", "Basketball: Foul"],
+      ["HOME RUN! {T}", "Baseball: Home run"], ["GRAND SLAM! {T}", "Baseball: Grand slam"], ["PITCHING CHANGE", "Baseball: Pitching change"],
+      ["END OF INNING", "Baseball: End of inning"], ["RAIN DELAY", "Baseball: Rain delay"],
+      ["ACE! {T}", "Volleyball: Ace"], ["SET POINT", "Volleyball: Set point"], ["MATCH POINT", "Volleyball: Match point"], ["SET WON: {T}", "Volleyball: Set won"],
+      ["GOAL! {T}", "Soccer: Goal"], ["YELLOW CARD", "Soccer: Yellow card"], ["RED CARD", "Soccer: Red card"], ["PENALTY KICK", "Soccer: Penalty kick"],
+      ["SUBSTITUTION", "Soccer: Substitution"], ["EXTRA TIME", "Soccer: Extra time"], ["PENALTY SHOOTOUT", "Soccer: Penalty shootout"],
+      ["TIMEOUT {T}", "Any sport: Timeout"], ["END OF QUARTER", "Any sport: End of quarter"], ["HALFTIME", "Any sport: Halftime"],
+      ["OVERTIME", "Any sport: Overtime"], ["FINAL", "Any sport: Final"], ["custom", "Custom text..."]] },
+    { k: "text", t: "Custom text", d: "", ph: "TOUCHDOWN {T}!", show: s => s.preset === "custom" },
+    { k: "colorMode", t: "Banner color", d: st => (st.color ? "custom" : "accent"), hint: "{T} in the message becomes that team's name. Team colors come from Scorebug Studio's Teams tab.", o: [
+      ["accent", "Generic (scorebug accent color)"], ["home", "Home team color"], ["away", "Away team color"], ["custom", "Custom color..."]] },
+    { k: "color", t: "Custom color", type: "color", d: "#c8102e", show: s => s.colorMode === "custom" },
+    { k: "label", t: "Key label", d: "", ph: "optional, auto from message" },
+    { k: "autoHide", t: "Auto-hide (s)", type: "number", d: "6", hint: "0 = stays until tapped again." }
+  ],
+  possession: [{ k: "side", t: "Team", o: SIDE, d: "home" }],
+  timeout: [{ k: "side", t: "Team", o: SIDE, d: "home", hint: "Tap uses a timeout, hold gives one back." }],
+  counter: [{ k: "field", t: "Counts", d: "down", hint: "Tap +1, hold -1.", o: [
+    ["down", "Football: Down"], ["toGo", "Football: Yards to go"], ["homeFouls", "Basketball: Home fouls"], ["awayFouls", "Basketball: Away fouls"],
+    ["balls", "Baseball: Balls"], ["strikes", "Baseball: Strikes"], ["outs", "Baseball: Outs"], ["inning", "Baseball: Inning"],
+    ["homeSets", "Volleyball: Home sets"], ["awaySets", "Volleyball: Away sets"]] }],
+  bases: [{ k: "base", t: "Base", d: "0", o: [["0", "1st"], ["1", "2nd"], ["2", "3rd"]], hint: "Hold clears all bases." }],
+  game: [
+    { k: "command", t: "Command", d: "next_half", o: [["next_half", "Next half-inning"], ["reset_count", "Clear balls/strikes"], ["end_set", "End set (volleyball)"], ["undo_set", "Undo last set"],
+      ["new_game", "New game (hold 1s)"], ["swap_teams", "Swap teams (hold 1s)"], ["set_sport", "Switch sport (hold 1s)"]] },
+    { k: "sport", t: "Sport", d: "football", o: [["football", "Football"], ["basketball", "Basketball"], ["baseball", "Baseball"], ["volleyball", "Volleyball"], ["soccer", "Soccer"]], show: s => s.command === "set_sport" }
+  ],
+  periodlabel: [{ k: "label", t: "Show", d: "HALF", o: [["HALF", "HALF"], ["OT", "OT"], ["FINAL", "FINAL"]], hint: "Replaces the quarter on the scorebug. Tap again (or go to the next period) to bring the quarter back." }],
+  card: [
+    { k: "side", t: "Team", o: SIDE, d: "home" },
+    { k: "card", t: "Card", o: [["yellow", "Yellow card"], ["red", "Red card"]], d: "yellow", hint: "Soccer only. Tap adds a card, hold removes one." }
+  ],
+  shootout: [
+    { k: "kick", t: "Function", d: "goal", o: [["goal", "Penalty GOAL"], ["miss", "Penalty MISS"], ["undo", "Undo last kick"], ["show", "Show shootout on scorebug"]],
+      hint: "GOAL / MISS: hold takes the last kick back. Show: tap shows or hides it, hold 1 s clears the whole shootout." },
+    { k: "side", t: "Team", o: SIDE, d: "home", show: s => s.kick !== "show" }
+  ],
+  visibility: [], period: []
+};
+
+let ws, uuid, actionUUID, settings = {}, global = {};
+const $ = id => document.getElementById(id);
+
+function connectElgatoStreamDeckSocket(port, pluginUUID, registerEvent, info, actionInfo) {
+  uuid = pluginUUID;
+  const ai = JSON.parse(actionInfo);
+  actionUUID = ai.action.split(".").pop();
+  settings = Object.assign({}, ai.payload.settings || {});
+  ws = new WebSocket("ws://127.0.0.1:" + port);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ event: registerEvent, uuid }));
+    ws.send(JSON.stringify({ event: "getGlobalSettings", context: uuid }));
+  };
+  ws.onmessage = m => {
+    const d = JSON.parse(m.data);
+    if (d.event === "didReceiveGlobalSettings") {
+      global = d.payload.settings || {};
+      $("host").value = global.host || "";
+      $("port").value = global.port || "";
+    }
+  };
+  build();
+}
+
+function build() {
+  const box = $("fields");
+  box.innerHTML = "";
+  const defs = DEFS[actionUUID] || [];
+  let dirty = false;
+  for (const f of defs) {
+    const row = document.createElement("div");
+    row.className = "row"; row.dataset.k = f.k;
+    const lab = document.createElement("label"); lab.textContent = f.t; row.appendChild(lab);
+    let el;
+    if (f.o) {
+      el = document.createElement("select");
+      for (const [v, t] of f.o) { const o = document.createElement("option"); o.value = v; o.textContent = t; el.appendChild(o); }
+    } else {
+      el = document.createElement("input");
+      el.type = f.type || "text";
+      if (f.ph) el.placeholder = f.ph;
+      if (f.type === "number") { el.min = 0; el.max = 3600; }
+    }
+    el.id = "f_" + f.k;
+    if (settings[f.k] === undefined) { settings[f.k] = typeof f.d === "function" ? f.d(settings) : f.d; dirty = true; }
+    el.value = settings[f.k];
+    el.addEventListener("input", () => { settings[f.k] = el.value; save(); refresh(); });
+    row.appendChild(el);
+    box.appendChild(row);
+    if (f.hint) { const h = document.createElement("div"); h.className = "hint"; h.textContent = f.hint; box.appendChild(h); }
+  }
+  refresh();
+  if (dirty && defs.length) save(); // store the defaults that are shown so what you see is what the key does
+}
+
+function refresh() {
+  const cur = {};
+  for (const f of DEFS[actionUUID] || []) cur[f.k] = $("f_" + f.k).value;
+  for (const f of DEFS[actionUUID] || []) {
+    const r = document.querySelector('.row[data-k="' + f.k + '"]');
+    if (r) r.hidden = f.show ? !f.show(cur) : false;
+  }
+}
+
+function save() {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ event: "setSettings", context: uuid, payload: settings }));
+}
+function saveGlobal() {
+  const port = parseInt($("port").value, 10);
+  global = { host: $("host").value.trim(), port: port > 0 ? port : undefined };
+  ws.send(JSON.stringify({ event: "setGlobalSettings", context: uuid, payload: global }));
+}
+$("host").addEventListener("change", saveGlobal);
+$("port").addEventListener("change", saveGlobal);
+</script>
+</body>
+</html>
