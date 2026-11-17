@@ -1,0 +1,114 @@
+name: Build installers
+
+# Runs when you publish a version tag such as v2.2.0 (this is what "Create a new release" does),
+# or by hand from the Actions tab (builds the files but does not publish a release).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          VER=$(python3 packaging/check_version.py "${GITHUB_REF_NAME}")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: prep
+    runs-on: windows-latest
+    env:
+      APP_VERSION: ${{ needs.prep.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-build.txt
+      - run: python packaging/build.py
+      - name: Make sure Inno Setup is available
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+      - name: Build installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=$env:APP_VERSION" packaging\windows-installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist-installer/*.exe
+
+  mac:
+    needs: prep
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest        # Apple Silicon (M1 and newer)
+            arch: arm64
+          - os: macos-15-intel      # Intel Macs
+            arch: intel
+    runs-on: ${{ matrix.os }}
+    env:
+      APP_VERSION: ${{ needs.prep.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-build.txt
+      - run: python packaging/build.py
+      - run: bash packaging/make_dmg.sh "$APP_VERSION" "${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-${{ matrix.arch }}-installer
+          path: dist-installer/*.dmg
+
+  streamdeck:
+    needs: prep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build and pack the plugin
+        working-directory: streamdeck-plugin
+        run: |
+          npm ci
+          npm run build
+          npx streamdeck pack com.scorebugstudio.controller.sdPlugin --force -o .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: streamdeck-plugin
+          path: streamdeck-plugin/*.streamDeckPlugin
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [prep, windows, mac, streamdeck]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-files
+          merge-multiple: true
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prep.outputs.version }}
+        run: |
+          ls -la release-files
+          python3 packaging/release_notes.py "$VERSION" > notes.md
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Scorebug Studio $VERSION" --notes-file notes.md
+          gh release upload "$GITHUB_REF_NAME" release-files/* --repo "$GITHUB_REPOSITORY" --clobber
