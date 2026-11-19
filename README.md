@@ -64,6 +64,8 @@ click *Use as Home / Use as Away*. Text color adjusts automatically for readabil
 **Style tab** - starts with the **OBS output link** and a **Copy link** button (paste it into an OBS Browser Source). Then, per sport: position (6 anchors), size, nudge X/Y, panel and accent colors, full name vs
 abbreviation, home team on left or right. Football/basketball also: period length, timeouts per team, tenths.
 
+**Info row size** (Style tab) enlarges the timeouts / fouls / bonus row under the scorebug for each sport.
+
 **Style tab also holds Other devices** - the switch, QR code and address for using the Stat Keeper or control panel from an iPad (see "Controlling from a tablet" below).
 
 **Scoreboard data tab** - see below.
@@ -129,12 +131,21 @@ game stays saved). Each sport has its own template:
 3. **BOX SCORE tab**: line score, team comparison and the box score tables for both teams. Export **CSV**,
    **Print / Save as PDF** or a JSON backup. **PLAY-BY-PLAY tab** lists every play; delete any one and all totals recalculate.
 
+**Basketball Quick mode (on by default)** is built for running stats alone: the whole roster is on screen (no subs, no minutes),
+and the buttons are just 2PT, 3PT, FT, REB, AST, STL, BLK, TO and FOUL. Tap a player, tap the play. A made basket is recorded
+instantly and a small **Assist?** strip appears for a few seconds - tap the passer's number, or ignore it. When the period clock
+reaches 0:00 the next-period button lights up (NEXT Q2 ▶). Misses, subs and minutes/plus-minus come back if you untick
+**Quick mode** in GAME -> Rules & options.
+
 Basketball team fouls count **per quarter** (and per overtime period); a team shows BONUS once the opposing team reaches 5, matching the scorebug.
 
 **With Scorebug Studio running** on the same sport, the stat keeper shares the game clock and period (football, basketball,
 soccer), the inning and half (baseball) or the set number (volleyball), and sends the score to the on-air scorebug - plus team
-fouls for basketball and cards for soccer. If the two ever disagree a yellow bar offers "Set scorebug to stats". If the
-scorebug is on another sport, tap the status chip to switch it. Without the scorebug, the stat keeper runs its own clock.
+fouls for basketball and cards for soccer. The two stay matched automatically: if you change the score on the scorebug itself
+(control panel or Stream Deck) the stat keeper follows with a "Score corrected to match scorebug" line in the play-by-play, and
+plays recorded while the scorebug was disconnected are sent when it reconnects. (Turn this off with "Keep the stats score
+equal to the scorebug" in GAME -> Scorebug Studio link.) If they ever do disagree, a yellow bar offers **Use scorebug score**
+or **Set scorebug to stats**. If the scorebug is on another sport, tap the status chip to switch it. Without the scorebug, the stat keeper runs its own clock.
 Baseball: when the third out is recorded tap **NEXT HALF** (the stat keeper does not guess, so you can fix a mistake first).
 
 Data is saved in the browser *and* on the computer running Scorebug Studio (`data/stats/`), so clearing the browser

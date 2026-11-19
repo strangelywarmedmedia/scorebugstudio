@@ -39,7 +39,7 @@ try:
 except ImportError:
     sys.exit("Missing dependency. Install with: pip install websockets pyserial")
 
-VERSION = "2.1.0"
+VERSION = "2.2.1"
 
 # --------------------------------------------------------------------------
 # Defaults
@@ -126,7 +126,7 @@ def default_game(toMax=3):
 
 def default_style():
     return {
-        "position": "top-left", "offsetX": 0, "offsetY": 0, "scale": 1.0,
+        "position": "top-left", "offsetX": 0, "offsetY": 0, "scale": 1.0, "footScale": 1.0,
         "homeFirst": False, "nameMode": "name",
         "panel": "#0f1319", "accent": "#ffc20e",
         "showClock": True,

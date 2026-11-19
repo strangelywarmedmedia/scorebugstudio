@@ -83,7 +83,7 @@ function pollServer() {
 }
 
 /* per-sport remembered options (period length, assist prompt...). Older single-sport saves count as basketball. */
-var PREF_KEYS = ['periods', 'periodMin', 'otMin', 'assistPrompt', 'keepSelected', 'syncScorebug', 'useScorebugClock'];
+var PREF_KEYS = ['periods', 'periodMin', 'otMin', 'assistPrompt', 'keepSelected', 'syncScorebug', 'useScorebugClock', 'autoMatch', 'quick'];
 function prefsFor(sport) {
   var p = DB.prefs || {}, base = {};
   if (sport === 'basketball') PREF_KEYS.forEach(function (k) { if (p[k] !== undefined) base[k] = p[k]; });
@@ -117,6 +117,9 @@ function ensureGame() {
 
 /* ============================================================ clock & period */
 function sbOK() { return sbConnected && sb && sb.sport === G.sport; }
+/** Quick mode (basketball): one-tap scoring + key stats, whole roster shown, no subs / minutes / misses */
+function quick() { return !!(G && G.settings.quick && D().quickButtons); }
+function btnList() { return quick() ? D().quickButtons : D().buttons; }
 function sbUse() { return sbOK() && G.settings.useScorebugClock; }
 function sbPeriod() {
   if (G.sport === 'baseball') return { period: sb.game && sb.game.inning, half: sb.game && sb.game.half };
@@ -230,6 +233,7 @@ function onSbState(first) {
     }
   }
   if (changed) { touch(); if (periodMoved) rebase(); pushDeltas(); refreshAll(); } else { renderBar(); renderChip(); if (tab === 'game') renderGameLive(); }
+  checkMatch(first);
 }
 function renderChip() {
   var c = $('#sbChip'), t = $('#sbTxt');
@@ -259,20 +263,50 @@ function rebase() {
   var m = metrics();
   Object.keys(m.reset).forEach(function (p) { lastSync.v[p] = m.v[p]; });
 }
+var lastPushAt = 0, lastSbSeen = null, matchTimer = null;
 function pushDeltas() {
   var m = metrics();
   if (lastSync && sbOK() && G.settings.syncScorebug) {
     Object.keys(m.v).forEach(function (p) {
       var d = m.v[p] - (lastSync.v[p] || 0);
-      if (d) sbSend({ type: 'inc', path: p, delta: d, min: 0 });
+      if (d && sbSend({ type: 'inc', path: p, delta: d, min: 0 })) lastPushAt = Date.now();
     });
   }
   lastSync = m;
 }
 function syncNow() {
   var m = metrics();
-  Object.keys(m.v).forEach(function (p) { sbSend({ type: 'set', path: p, value: m.v[p] }); });
+  Object.keys(m.v).forEach(function (p) { if (sbSend({ type: 'set', path: p, value: m.v[p] })) lastPushAt = Date.now(); });
   lastSync = m;
+}
+/* Keep the stats score equal to the scorebug score. If somebody changes the score on the scorebug (control panel, Stream Deck),
+   the stats follow with an unattributed 'score corrected' entry, so the two can never drift apart quietly. */
+function sbScoreDiff() {
+  if (!C || !sbOK() || !sb.teams) return null;
+  return { home: sb.teams.home.score - C.cur.home, away: sb.teams.away.score - C.cur.away };
+}
+function checkMatch(first) {
+  var d = sbScoreDiff(); if (!d) return;
+  var seen = lastSbSeen;
+  lastSbSeen = { home: sb.teams.home.score, away: sb.teams.away.score, gid: G.id };
+  clearTimeout(matchTimer);
+  if (!d.home && !d.away) return;
+  if (!G.settings.syncScorebug) return;
+  if (first) { // just (re)connected: if nobody touched the scorebug while we were away, the stats are right
+    if (seen && seen.gid === G.id && seen.home === lastSbSeen.home && seen.away === lastSbSeen.away) { syncNow(); toast('Scorebug caught up with the stats'); }
+    return; // otherwise the bar asks which one to trust
+  }
+  if (G.settings.autoMatch) matchTimer = setTimeout(function () { matchToScorebug(true); }, 800);
+}
+function matchToScorebug(auto) {
+  var d = sbScoreDiff(); if (!d || (!d.home && !d.away)) return;
+  if (auto && Date.now() - lastPushAt < 1500) { clearTimeout(matchTimer); matchTimer = setTimeout(function () { matchToScorebug(true); }, 600); return; } // our own push is still on its way back
+  var evs = [];
+  ['home', 'away'].forEach(function (side) { if (d[side]) evs.push(mk(side, E.TEAM, 'adj', { pts: d[side] })); });
+  E.addEvents(G, evs); persist();
+  lastSync = metrics(); // stats now equal the scorebug: nothing to push back
+  refreshAll();
+  toast('Stats score matched to the scorebug (' + sb.teams.home.score + '–' + sb.teams.away.score + ')', true);
 }
 
 /* ============================================================ recording */
@@ -293,7 +327,7 @@ function mk(side, pid, type, extra) { return E.makeEvent(G, side, pid, type, ctx
 function afterRecord() { if (!G.settings.keepSelected) selPid = null; refreshAll(); }
 
 function act(i) {
-  var def = D(), b = def.buttons[i]; if (!b) return;
+  var def = D(), b = btnList()[i]; if (!b) return;
   if (b.t === 'sub') { if (!selPid) return toast('Pick a player first'); return openSub(); }
   if (b.flow === 'pch') return openPitcherChange();
   if (!selPid) { $('#hint') && ($('#hint').textContent = 'Tap a player first'); toast('Pick a player first'); return; }
@@ -311,6 +345,13 @@ function act(i) {
     commit(evs, E.describe(G, evs[0]) + (assistPid ? ' (ast ' + E.playerLabel(G, side, assistPid) + ')' : ''));
     afterRecord();
   };
+  if (quick() && (def.assistFor || []).indexOf(type) >= 0 && pid !== E.TEAM) { // record at once, offer the assist without blocking
+    var qg = E.uid(), qe = mk(side, pid, type, { grp: qg });
+    commit([qe], E.describe(G, qe));
+    afterRecord();
+    if (G.settings.assistPrompt) showAssist(side, pid, qg);
+    return;
+  }
   if ((def.assistFor || []).indexOf(type) >= 0 && G.settings.assistPrompt && pid !== E.TEAM) {
     var pool = def.lineup ? onCourt(side) : G.teams[side].players.map(function (p) { return p.id; });
     var mates = pool.filter(function (p) { return p !== pid; });
@@ -325,6 +366,29 @@ function act(i) {
     }
   }
   finish(null);
+}
+
+var astTimer = null;
+function hideAssist() { clearTimeout(astTimer); var d = document.getElementById('astStrip'); if (d) d.remove(); }
+function showAssist(side, scorer, grp) {
+  hideAssist();
+  var pool = G.teams[side].players.filter(function (p) { return p.id !== scorer; }).sort(byNum);
+  if (!pool.length) return;
+  var d = document.createElement('div'); d.id = 'astStrip'; d.className = 'noprint'; d.dataset.side = side; d.dataset.grp = grp;
+  d.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(66px + env(safe-area-inset-bottom));z-index:65;background:#17301f;border:1px solid #2f6b3f;border-radius:12px;padding:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-height:38vh;overflow:auto';
+  d.innerHTML = '<b style="margin-right:4px">Assist?</b>' + pool.map(function (p) {
+    return '<button data-act="qassist" data-v="' + p.id + '" style="min-width:48px" title="' + esc(p.name) + '">' + esc(p.num) + '</button>';
+  }).join('') + '<button class="sm" data-act="qassist" data-v="">No assist</button>';
+  document.body.appendChild(d);
+  astTimer = setTimeout(hideAssist, 7000);
+}
+function pickAssist(pid) {
+  var d = document.getElementById('astStrip'); if (!d) return;
+  var side = d.dataset.side, grp = d.dataset.grp; hideAssist();
+  if (!pid) return;
+  if (!G.events.some(function (e) { return e.grp === grp; })) return; // that basket was undone
+  var e = mk(side, pid, 'ast', { grp: grp });
+  commit([e], 'Assist: ' + E.playerLabel(G, side, pid)); afterRecord();
 }
 
 /* football: a completed pass credits the passer and the receiver together */
@@ -425,6 +489,7 @@ function openSub() {
 }
 function resync() { refreshAll(); lastSync = metrics(); }
 function undoLast() {
+  hideAssist();
   var r = E.undo(G);
   if (!r.length) return toast('Nothing to undo');
   persist(); pushDeltas(); refreshAll();
@@ -512,14 +577,14 @@ function renderBar() {
     var a = sb.teams.home.score, b = sb.teams.away.score;
     if (a !== C.cur.home || b !== C.cur.away) {
       mm = '<div class="mismatch noprint">Scorebug shows ' + a + '–' + b + ', stats say ' + C.cur.home + '–' + C.cur.away +
-        ' <button class="sm" data-act="syncnow">Set scorebug to stats</button></div>';
+        ' <button class="sm" data-act="matchsb">Use scorebug score</button> <button class="sm" data-act="syncnow">Set scorebug to stats</button></div>';
     }
   }
   $('#sbar').innerHTML = h + mm;
   var mid = '<div class="per">' + midLabel(ci) + '</div>';
   if (def.clock) {
     mid += '<div class="clk' + (ci.running ? ' run' : '') + '" id="clockTxt" data-act="clockset"></div>' +
-      '<div class="ctl"><button class="sm" data-act="per" data-v="-1">◀</button><button class="sm ' + (ci.running ? 'warn' : 'good') + '" id="clkBtn" data-act="clock">' + (ci.running ? 'STOP <kbd>Space</kbd>' : 'START <kbd>Space</kbd>') + '</button><button class="sm" data-act="per" data-v="1">▶</button></div>';
+      '<div class="ctl"><button class="sm" data-act="per" data-v="-1">◀</button><button class="sm ' + (ci.running ? 'warn' : 'good') + '" id="clkBtn" data-act="clock">' + (ci.running ? 'STOP <kbd>Space</kbd>' : 'START <kbd>Space</kbd>') + '</button><button class="sm' + (ci.ms <= 0 && !ci.running && ci.period < G.settings.periods ? ' good' : '') + '" data-act="per" data-v="1">' + (ci.ms <= 0 && !ci.running && ci.period < G.settings.periods ? 'NEXT ' + E.periodLabel(G, ci.period + 1) + ' ' : '') + '▶</button></div>';
   } else {
     var nxt = '▶', prv = '◀', hot = '';
     if (G.sport === 'baseball') {
@@ -549,7 +614,7 @@ function pcard(side, pl, opts) {
   var cls = 'pc' + (selPid === pl.id && curSide === side ? ' sel' : '') + (def.cardCls ? def.cardCls(l) : '');
   var tag = def.cardTag ? def.cardTag(l) : '';
   return '<button class="' + cls + '" data-act="selp" data-v="' + pl.id + '">' + (opts && opts.key ? '<kbd class="k">' + opts.key + '</kbd>' : '') +
-    '<span class="pf">' + tag + '</span><span class="n">' + esc(pl.num) + '</span><span class="pn">' + esc(pl.name || ' ') + (pl.pos ? ' <span class="muted small">' + esc(pl.pos) + '</span>' : '') + '</span><span class="st">' + def.card(l) + '</span></button>';
+    '<span class="pf">' + tag + '</span><span class="n">' + esc(pl.num) + '</span><span class="pn">' + esc(pl.name || ' ') + (pl.pos ? ' <span class="muted small">' + esc(pl.pos) + '</span>' : '') + '</span><span class="st">' + (quick() && def.quickCard ? def.quickCard(l) : def.card(l)) + '</span></button>';
 }
 function benchChip(side, pl) {
   var def = D(), l = C.sides[side].players[pl.id] || E.blank(G);
@@ -569,7 +634,7 @@ function renderLive() {
     var pid = C.pitcher[side], pp = pid && E.findPlayer(G, side, pid);
     h += '<div class="pit">Pitching for ' + esc(T.name) + ': <b>' + (pp ? esc('#' + pp.num + ' ' + pp.name) : 'nobody set') + '</b> <button class="sm" data-act="pitchchg">Change pitcher</button></div>';
   }
-  if (def.lineup) {
+  if (def.lineup && !quick()) {
     var on = onCourt(side), onPl = on.map(function (id) { return E.findPlayer(G, side, id); }).filter(Boolean);
     var bench = sorted.filter(function (p) { return on.indexOf(p.id) < 0; });
     var word = G.sport === 'soccer' ? 'ON THE FIELD' : 'ON COURT';
@@ -588,7 +653,7 @@ function renderLive() {
   h += '<button class="pc add" data-act="addp"><span class="pn">+ Player</span></button></div></div>';
 
   h += '<div><div class="hint" id="hint">' + (selPid ? 'Selected: <b>' + esc(E.playerLabel(G, side, selPid)) + '</b>' : 'Tap a player, then tap what happened') + '</div>';
-  h += '<div class="acts">' + def.buttons.map(function (b, i) {
+  h += '<div class="acts' + (quick() ? ' quick' : '') + '">' + btnList().map(function (b, i) {
     return '<button class="' + (b.cls || '') + '" data-act="actb" data-v="' + i + '">' + b.label + (b.sub ? '<small>' + b.sub + '</small>' : '') + (b.key ? '<kbd>' + b.key.toUpperCase() + '</kbd>' : '') + '</button>';
   }).join('') + '<button class="warn wide" data-act="undo">UNDO <kbd>Z</kbd></button></div>';
   var recent = G.events.slice(-4).reverse();
@@ -603,7 +668,7 @@ function renderLive() {
 function boxTables(side) {
   var def = D(), st = C.sides[side], on = C.onCourt[side], rows = E.boxRows(G, C, side), out = '';
   def.tables.forEach(function (tb) {
-    var cols = tb.cols;
+    var cols = quick() && def.quickCols ? def.quickCols : tb.cols;
     function cells(l, isTeam) {
       return cols.map(function (c) {
         if (isTeam && c.team === false) return '<td></td>';
@@ -722,6 +787,7 @@ function renderGame() {
     (def.clock ? '<div><label class="f">' + lenLabel + (sbUse() ? ' — follows scorebug' : '') + '</label><input type="number" step="0.5" min="1" data-f="periodMin" value="' + S.periodMin + '"' + (sbUse() ? ' disabled' : '') + '></div>' : '') +
     (def.clock && G.sport !== 'football' ? '<div><label class="f">' + (G.sport === 'soccer' ? 'Extra-time half (min)' : 'Overtime length (min)') + '</label><input type="number" step="0.5" min="1" data-f="otMin" value="' + S.otMin + '"></div>' : '') + '</div>' +
     '<div class="row" style="margin-top:12px;gap:18px">' +
+    (def.quickButtons ? '<label class="row" style="gap:8px"><input type="checkbox" data-f="quick"' + (S.quick ? ' checked' : '') + '> <b>Quick mode</b> — one tap per play: scoring + key stats, no subs, minutes or misses</label>' : '') +
     (def.assistFor ? '<label class="row" style="gap:8px"><input type="checkbox" data-f="assistPrompt"' + (S.assistPrompt ? ' checked' : '') + '> Ask for the assist after a ' + (G.sport === 'soccer' ? 'goal' : 'made basket') + '</label>' : '') +
     '<label class="row" style="gap:8px"><input type="checkbox" data-f="keepSelected"' + (S.keepSelected ? ' checked' : '') + '> Keep player selected after each stat</label></div></div>';
   h += '<div class="card"><h3>Scorebug Studio link</h3><div id="sbBox"></div></div>';
@@ -755,6 +821,7 @@ function renderGameLive() {
     var shareLabel = def.clock ? 'Use the scorebug clock &amp; period' : G.sport === 'baseball' ? 'Use the scorebug inning &amp; half-inning' : 'Use the scorebug set number';
     h = '<p>Connected. ' + sbSyncText() + '</p><div class="row">' +
       '<label class="row" style="gap:8px"><input type="checkbox" data-f="syncScorebug"' + (G.settings.syncScorebug ? ' checked' : '') + '> Send the score' + (G.sport === 'basketball' ? ' &amp; team fouls' : G.sport === 'soccer' ? ' &amp; cards' : '') + ' to the scorebug</label>' +
+      '<label class="row" style="gap:8px"><input type="checkbox" data-f="autoMatch"' + (G.settings.autoMatch ? ' checked' : '') + '> Keep the stats score equal to the scorebug (follow changes made on the scorebug)</label>' +
       '<label class="row" style="gap:8px"><input type="checkbox" data-f="useScorebugClock"' + (G.settings.useScorebugClock ? ' checked' : '') + '> ' + shareLabel + '</label></div>' +
       '<div class="row" style="margin-top:10px"><button data-act="pushnames">Send team names to scorebug</button><button data-act="pullnames">Use names from scorebug</button><button data-act="syncnow">Set scorebug to match stats</button></div>';
   }
@@ -992,6 +1059,8 @@ var actions = {
       sbSend({ type: 'action', name: 'set_sport', args: { sport: G.sport } }); setTimeout(function () { refreshAll(); syncNow(); }, 400);
     });
   },
+  qassist: function (el) { pickAssist(el.dataset.v); },
+  matchsb: function () { matchToScorebug(false); },
   syncnow: function () { if (sbOK()) { syncNow(); toast('Scorebug updated to match stats'); } },
   pushnames: function () {
     ['home', 'away'].forEach(function (s) { sbSend({ type: 'set', path: 'teams.' + s + '.name', value: G.teams[s].name }); sbSend({ type: 'set', path: 'teams.' + s + '.abbr', value: G.teams[s].abbr }); });
@@ -1072,11 +1141,11 @@ document.addEventListener('change', function (ev) {
       if (!G.local.running && Math.abs(G.local.ms - old) < 1) G.local.ms = E.periodLenSec(G, G.period) * 1000;
       break;
     }
-    case 'assistPrompt': case 'keepSelected': case 'syncScorebug': case 'useScorebugClock': S[f] = el.checked; setPref(f, el.checked); break;
+    case 'assistPrompt': case 'quick': case 'autoMatch': case 'keepSelected': case 'syncScorebug': case 'useScorebugClock': S[f] = el.checked; setPref(f, el.checked); break;
     default: return;
   }
   touch(); pushDeltas();
-  if (f === 'tname' || f === 'tabbr' || f === 'periods' || f === 'periodMin' || f === 'otMin' || f === 'useScorebugClock' || f === 'num') refreshAll(); else { var ci = clockInfo(); C = E.compute(G, E.elapsed(G, ci.period, ci.ms)); renderBar(); }
+  if (f === 'tname' || f === 'tabbr' || f === 'periods' || f === 'periodMin' || f === 'otMin' || f === 'useScorebugClock' || f === 'quick' || f === 'num') refreshAll(); else { var ci = clockInfo(); C = E.compute(G, E.elapsed(G, ci.period, ci.ms)); renderBar(); }
 });
 
 document.addEventListener('keydown', function (ev) {
@@ -1088,10 +1157,10 @@ document.addEventListener('keydown', function (ev) {
   if (k === ' ') { if (!D().clock) return; ev.preventDefault(); return clockToggle(); }
   if (tab !== 'live') return;
   if (k === 'z') return undoLast();
-  var bi = -1; D().buttons.forEach(function (b, i) { if (b.key === k && bi < 0) bi = i; });
+  var bi = -1; btnList().forEach(function (b, i) { if (b.key === k && bi < 0) bi = i; });
   if (bi >= 0) return act(bi);
   if (k === '0') { selPid = E.TEAM; return refreshAll(); }
-  if (D().lineup && /^[1-9]$/.test(k)) { var on = onCourt(curSide), id = on[parseInt(k, 10) - 1]; if (id) { selPid = id; refreshAll(); } return; }
+  if (D().lineup && !quick() && /^[1-9]$/.test(k)) { var on = onCourt(curSide), id = on[parseInt(k, 10) - 1]; if (id) { selPid = id; refreshAll(); } return; }
   if (k === 'h') { curSide = 'home'; selPid = null; refreshAll(); }
   if (k === 'j') { curSide = 'away'; selPid = null; refreshAll(); }
 });
@@ -1112,5 +1181,5 @@ document.addEventListener('visibilitychange', function () { if (document.hidden)
 window.addEventListener('pagehide', function () { if (dirtyPush) pushServer(true); });
 connectWS();
 
-window.SK = { clockInfo: clockInfo, E: E, RP: RP, get G() { return G; }, get DB() { return DB; }, get C() { return C; }, refreshAll: refreshAll, metrics: metrics, act: act, changeSport: changeSport };
+window.SK = { clockInfo: clockInfo, E: E, RP: RP, get G() { return G; }, get DB() { return DB; }, get C() { return C; }, refreshAll: refreshAll, metrics: metrics, act: act, changeSport: changeSport, dropScorebug: function () { try { ws.close(); } catch (e) { } } };
 })();

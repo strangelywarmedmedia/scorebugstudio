@@ -52,8 +52,28 @@
       stl: { label: 'Steal', fx: { stl: 1 } },
       blk: { label: 'Block', fx: { blk: 1 } },
       to: { label: 'Turnover', fx: { to: 1 } },
-      pf: { label: 'Foul', fx: { pf: 1 }, tf: 1 }
+      pf: { label: 'Foul', fx: { pf: 1 }, tf: 1 },
+      reb: { label: 'Rebound', fx: { dreb: 1 } } // quick mode: one REB button (counted in the rebound total)
     },
+    // Quick mode: scoring + key stats only, one tap each. No misses, subs or minutes.
+    quickButtons: [
+      { t: '2m', label: '2PT', cls: 'made', key: 'q' }, { t: '3m', label: '3PT', cls: 'made', key: 'e' }, { t: 'ftm', label: 'FT', cls: 'made', key: 't' },
+      { t: 'reb', label: 'REB', key: 'o' }, { t: 'ast', label: 'AST', key: 'a' }, { t: 'stl', label: 'STL', key: 's' },
+      { t: 'blk', label: 'BLK', key: 'b' }, { t: 'to', label: 'TO', key: 'v' }, { t: 'pf', label: 'FOUL', cls: 'foul', key: 'f' }
+    ],
+    quickCols: [
+      { h: 'PTS', v: function (l) { return l.pts; }, bold: true },
+      { h: '2PM', v: function (l) { return l.fgm - l.tpm; } },
+      { h: '3PM', v: function (l) { return l.tpm; } },
+      { h: 'FTM', v: function (l) { return l.ftm; } },
+      { h: 'REB', v: function (l) { return reb(l); } },
+      { h: 'AST', v: function (l) { return l.ast; } },
+      { h: 'STL', v: function (l) { return l.stl; } },
+      { h: 'BLK', v: function (l) { return l.blk; } },
+      { h: 'TO', v: function (l) { return l.to; } },
+      { h: 'PF', v: function (l) { return l.pf; }, hi: function (l) { return l.pf >= 5; } }
+    ],
+    quickCard: function (l) { return '<b>' + l.pts + '</b> pts · ' + reb(l) + ' reb · ' + l.ast + ' ast'; },
     buttons: [
       { t: '2m', label: '2PT ✓', cls: 'made', key: 'q' }, { t: '2x', label: '2PT ✗', cls: 'miss', key: 'w' },
       { t: '3m', label: '3PT ✓', cls: 'made', key: 'e' }, { t: '3x', label: '3PT ✗', cls: 'miss', key: 'r' },
@@ -396,7 +416,7 @@
   // ---------- settings / games ----------
   function defaultSettings(sport) {
     var d = sportDef(sport || 'basketball');
-    return { periods: d.periods, periodMin: d.periodMin, otMin: d.otMin, assistPrompt: true, keepSelected: false, syncScorebug: true, useScorebugClock: true };
+    return { periods: d.periods, periodMin: d.periodMin, otMin: d.otMin, assistPrompt: true, keepSelected: false, syncScorebug: true, useScorebugClock: true, autoMatch: true, quick: true };
   }
 
   function newGame(opts) {
@@ -546,11 +566,11 @@
       if (def.id === 'baseball') { var sp = (g.teams[side].starters || [])[0]; out.pitcher[side] = sp && st.players[sp] ? sp : null; }
     });
 
-    function addScore(side, pts, period, pmOn) {
+    function addScore(side, pts, period, noPm) {
       out.score[side] += pts;
       var pi = (period || 1) - 1;
       out.byPeriod[side][pi] = (out.byPeriod[side][pi] || 0) + pts;
-      if (def.pm) {
+      if (def.pm && !noPm) {
         out.onCourt[side].forEach(function (pid) { out.sides[side].players[pid].pm += pts; });
         var os = otherSide(side);
         out.onCourt[os].forEach(function (pid) { out.sides[os].players[pid].pm -= pts; });
@@ -577,6 +597,7 @@
         }
         return;
       }
+      if (e.type === 'adj') { addScore(side, e.pts || 0, e.period, true); return; } // scorebug correction: team score only, no player credit
       var ed = def.events[e.type];
       if (!ed) return;
       if (ed.special === 'pch') { if (st.players[e.pid]) out.pitcher[side] = e.pid; return; }
@@ -672,6 +693,7 @@
   /** points this event adds to each team's score (for the running score in play-by-play) */
   function scoreDelta(g, e) {
     var d = { home: 0, away: 0 }, ed = sportDef(g).events[e.type];
+    if (e.type === 'adj' && e.side) { d[e.side] += e.pts || 0; return d; }
     if (!ed || !e.side) return d;
     if (ed.pts) d[e.side] += ed.pts;
     if (ed.ptsOpp) d[otherSide(e.side)] += ed.ptsOpp;
@@ -685,6 +707,7 @@
       var outp = e.out ? playerLabel(g, e.side, e.out) : '';
       return 'SUB ' + (inn ? 'in ' + inn : '') + (inn && outp ? ', ' : '') + (outp ? 'out ' + outp : '');
     }
+    if (e.type === 'adj') return 'Score corrected to match scorebug (' + (e.pts > 0 ? '+' : '') + e.pts + ')';
     var ed = def.events[e.type] || {};
     if (ed.special === 'pch') return 'Pitching change: ' + playerLabel(g, e.side, e.pid) + ' now pitching';
     var tail = '';
