@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scorebug Studio</title>
+<link rel="stylesheet" href="/fonts/fonts.css">
+<style>
+  :root{--bg:#0e1116;--panel:#171c23;--panel2:#1e252e;--line:#2a323d;--text:#e8edf3;--dim:#8d99a8;
+        --accent:#ffc20e;--good:#1f9d55;--bad:#d64545;--blue:#2f7de1}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  h1,h2,h3,.cond{font-family:'Barlow Condensed','Arial Narrow',sans-serif}
+  button,input,select{font:inherit;color:inherit}
+  button{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 14px;cursor:pointer;
+         transition:background .12s,border-color .12s,transform .05s;min-height:40px}
+  button:hover{background:#27303b;border-color:#3a4552}
+  button:active{transform:translateY(1px)}
+  button.on{background:var(--accent);border-color:var(--accent);color:#14181d;font-weight:700}
+  button.good{background:var(--good);border-color:var(--good);color:#fff;font-weight:700}
+  button.warn{background:#3a2226;border-color:#5a2b31;color:#ffb3b3}
+  button.big{min-height:56px;font-size:20px;font-weight:700;letter-spacing:.5px}
+  input[type=text],input[type=number],select{background:#0f1319;border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-height:40px}
+  input:focus,select:focus{outline:2px solid var(--blue);outline-offset:-1px}
+  input[type=color]{width:54px;height:40px;padding:2px;background:#0f1319;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  label.f{display:block;color:var(--dim);font-size:12px;letter-spacing:.8px;text-transform:uppercase;margin:0 0 4px}
+  kbd{background:#0f1319;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:12px;color:var(--dim)}
+
+  /* top bar */
+  .top{position:sticky;top:0;z-index:20;display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 18px;
+       background:rgba(14,17,22,.96);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+  .brand{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;letter-spacing:1.5px;margin-right:6px}
+  .brand b{color:var(--accent)}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{border:0;border-radius:0;border-right:1px solid var(--line);background:var(--panel)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--accent);color:#14181d;font-weight:700}
+  .grow{flex:1}
+  #showBtn{min-width:190px;font-weight:800;letter-spacing:1px}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--bad);display:inline-block}
+  .dot.ok{background:#2ecc71;box-shadow:0 0 8px #2ecc71}
+  #srcNote{color:var(--accent);font-size:13px}
+
+  /* layout */
+  main{display:grid;grid-template-columns:minmax(0,1fr) 560px;gap:18px;padding:18px;max-width:1700px;margin:0 auto}
+  @media (max-width:1150px){main{grid-template-columns:1fr}.right{order:-1;position:static!important}}
+  .right{position:sticky;top:76px;align-self:start;display:flex;flex-direction:column;gap:14px}
+  .tabs{display:flex;gap:6px;margin-bottom:14px}
+  .tabs button{flex:1;font-weight:700;letter-spacing:.5px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h3{margin:0 0 10px;font-size:20px;letter-spacing:1px;text-transform:uppercase;color:var(--dim)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .stack{display:flex;flex-direction:column;gap:14px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row>*{flex:1 1 auto}
+  .row.nofill>*{flex:none}
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .muted{color:var(--dim);font-size:13px}
+
+  /* preview */
+  .preview{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#000;border:1px solid var(--line)}
+  .pv-scale{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0}
+  .pv-scale iframe{width:1920px;height:1080px;border:0;display:block}
+
+  /* team cards */
+  .thead{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;
+         font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;letter-spacing:1px;text-transform:uppercase}
+  .thead .tag{font-size:13px;opacity:.75;letter-spacing:2px}
+  .bigscore{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:104px;line-height:1;text-align:center;margin:6px 0 8px;font-variant-numeric:tabular-nums}
+  .sub{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .sub .lbl{width:92px;color:var(--dim);font-size:12px;letter-spacing:.8px;text-transform:uppercase}
+  .sub .val{min-width:34px;text-align:center;font-weight:800;font-size:22px;font-family:'Barlow Condensed',sans-serif}
+  .sub button{min-width:44px;padding:6px 10px}
+
+  .clockread{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:92px;line-height:1;text-align:center;font-variant-numeric:tabular-nums;margin:2px 0 10px}
+  .clockread.running{color:#2ecc71}
+  .counter{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--panel2);border-radius:10px;padding:10px}
+  .counter .n{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:48px;line-height:1}
+  .counter .lbl{color:var(--dim);font-size:12px;letter-spacing:1px;text-transform:uppercase}
+
+  /* teams tab */
+  .logobox{width:84px;height:84px;border-radius:10px;border:1px dashed #3a4552;display:flex;align-items:center;justify-content:center;
+           background:#2b2f36 conic-gradient(#3a3f47 25%,#2b2f36 0 50%,#3a3f47 0 75%,#2b2f36 0) 0 0/16px 16px;overflow:hidden;flex:none}
+  .logobox img{max-width:100%;max-height:100%}
+  .lib{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);margin-bottom:8px}
+  .lib .chip{width:10px;align-self:stretch;border-radius:4px}
+  .lib img{width:36px;height:36px;object-fit:contain}
+  .lib .nm{flex:1;font-weight:700}
+  .lib button{padding:6px 10px;min-height:34px;flex:none}
+
+  /* data tab */
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:5px 6px;text-align:left;font-size:14px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.8px}
+  td input,td select{min-height:34px;padding:5px 8px}
+  .hex{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.7;background:#0b0e12;border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto}
+  .hex .hrow{white-space:nowrap}
+  .hex .b{display:inline-block;width:2.4ch;margin-right:.6ch;text-align:center;border-radius:3px}
+  .hex .idx{color:var(--dim)}
+  .hex .m0{background:#2f6fd6}.hex .m1{background:#1f9d55}.hex .m2{background:#c07a12}.hex .m3{background:#a23fb8}.hex .m4{background:#188a95}.hex .m5{background:#b8423f}
+  .live{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent)}
+  .statusline{display:flex;align-items:center;gap:8px}
+  .notice{background:#2a2410;border:1px solid #5a4a14;color:#f1d98a;border-radius:10px;padding:10px 12px;font-size:14px}
+</style>
+<script src="/vendor/qrcode.min.js"></script>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">SCOREBUG <b>STUDIO</b></div>
+  <a href="/stats.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:6px 10px">Stat Keeper &#8599;</a>
+  <div class="seg" id="sportSeg">
+    <button data-action="set_sport" data-args='{"sport":"football"}' data-confirm="Switch sport? This starts a new game (scores, clock and counts reset; team names, colors and logos are kept).">Football</button>
+    <button data-action="set_sport" data-args='{"sport":"basketball"}' data-confirm="Switch sport? This starts a new game (scores, clock and counts reset; team names, colors and logos are kept).">Basketball</button>
+    <button data-action="set_sport" data-args='{"sport":"baseball"}' data-confirm="Switch sport? This starts a new game (scores, clock and counts reset; team names, colors and logos are kept).">Baseball</button>
+    <button data-action="set_sport" data-args='{"sport":"volleyball"}' data-confirm="Switch sport? This starts a new game (scores, clock and counts reset; team names, colors and logos are kept).">Volleyball</button>
+    <button data-action="set_sport" data-args='{"sport":"soccer"}' data-confirm="Switch sport? This starts a new game (scores, clock and counts reset; team names, colors and logos are kept).">Soccer</button>
+  </div>
+  <div class="seg" id="srcSeg" title="Where scores and clock come from">
+    <button data-source="manual">Manual</button>
+    <button data-source="serial">Scoreboard</button>
+  </div>
+  <span id="srcNote"></span>
+  <div class="grow"></div>
+  <button id="showBtn" class="big"></button>
+  <span id="conn" class="dot" title="Connection to the Scorebug server"></span>
+</header>
+
+<main>
+  <section class="left">
+    <div class="tabs" id="tabs">
+      <button data-tab="live">Live</button>
+      <button data-tab="teams">Teams</button>
+      <button data-tab="style">Style</button>
+      <button data-tab="data">Scoreboard data</button>
+    </div>
+
+    <!-- ============ LIVE ============ -->
+    <div class="tab stack" id="tab-live">
+      <div class="grid2" id="scoreRow"></div>
+
+      <div class="card" data-sport="football basketball soccer">
+        <h3>Game clock</h3>
+        <div class="clockread" id="clockRead">0:00</div>
+        <div class="row"><button class="big good" id="clockToggle">START / STOP &nbsp;<kbd>Space</kbd></button></div>
+        <div class="row" style="margin-top:8px">
+          <button data-action="clock_adjust" data-args='{"delta":-10000}'>-10s</button>
+          <button data-action="clock_adjust" data-args='{"delta":-1000}'>-1s</button>
+          <button data-action="clock_adjust" data-args='{"delta":1000}'>+1s</button>
+          <button data-action="clock_adjust" data-args='{"delta":10000}'>+10s</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input type="text" id="clockSet" placeholder="Set clock (e.g. 8:42 or 0:45.3)" style="flex:2">
+          <button id="clockSetBtn">Set</button>
+          <button data-action="clock_reset">Reset to start of period</button>
+        </div>
+        <div data-sport="soccer" style="margin-top:12px"><label class="f">Clock runs</label>
+          <div class="seg" style="display:flex"><button style="flex:1" data-action="clock_dir" data-args='{"dir":1}' data-dirval="1">Count UP</button><button style="flex:1" data-action="clock_dir" data-args='{"dir":-1}' data-dirval="-1">Count DOWN</button></div></div>
+        <div class="row" style="margin-top:12px">
+          <button data-toggle="styles.{sport}.showClock" id="showClockBtn" style="flex:1"></button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button data-action="period_prev">&#9664; Prev</button>
+          <div class="cond" style="flex:none;font-size:30px;font-weight:800;padding:0 10px;min-width:150px;text-align:center" id="periodShow">1ST</div>
+          <button data-action="period_next">Next period &#9654; <span class="muted">(resets clock)</span></button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input type="text" data-path="periodText" placeholder="Period label override (e.g. HALF)" style="flex:2">
+          <button data-set="periodText" data-value="HALF">HALF</button>
+          <button data-set="periodText" data-value="FINAL">FINAL</button>
+          <button data-set="periodText" data-value="">Clear</button>
+        </div>
+      </div>
+
+      <div class="card" data-sport="football">
+        <h3>Down &amp; distance</h3>
+        <label class="f">Down</label>
+        <div class="row">
+          <button data-set="game.down" data-value="0">None</button>
+          <button data-set="game.down" data-value="1">1st</button>
+          <button data-set="game.down" data-value="2">2nd</button>
+          <button data-set="game.down" data-value="3">3rd</button>
+          <button data-set="game.down" data-value="4">4th</button>
+          <button data-sets='[["game.down",1],["game.toGo","10"]]'>1st &amp; 10</button>
+        </div>
+        <div class="cols2" style="margin-top:10px">
+          <div><label class="f">Yards to go</label>
+            <input type="text" data-path="game.toGo" placeholder="10, GOAL, INCHES">
+            <div class="row" style="margin-top:6px">
+              <button data-set="game.toGo" data-value="1">1</button><button data-set="game.toGo" data-value="5">5</button>
+              <button data-set="game.toGo" data-value="10">10</button><button data-set="game.toGo" data-value="GOAL">GOAL</button>
+            </div></div>
+          <div><label class="f">Ball on</label>
+            <input type="text" data-path="game.ballOn" placeholder="e.g. OWN 35, WL 35, 50">
+            <div class="muted" style="margin-top:6px">Leave empty to hide. Down = None hides the whole strip.</div></div>
+        </div>
+      </div>
+
+      <div class="card" data-sport="baseball">
+        <h3>Baseball</h3>
+        <div class="cols3">
+          <div class="counter"><span class="lbl">Inning</span><span class="n" data-text="game.inning">1</span>
+            <div class="row nofill"><button data-inc="game.inning" data-delta="-1" data-min="1">-</button><button data-inc="game.inning" data-delta="1" data-min="1">+</button></div></div>
+          <div class="counter"><span class="lbl">Half</span>
+            <div class="row nofill" style="flex-direction:column;width:100%"><button data-set="game.half" data-value="top">&#9650; Top</button><button data-set="game.half" data-value="bot">&#9660; Bottom</button></div></div>
+          <div class="counter"><span class="lbl">Bases</span>
+            <div class="row nofill" style="width:100%"><button data-toggle="game.bases.2" style="flex:1">3B</button><button data-toggle="game.bases.1" style="flex:1">2B</button><button data-toggle="game.bases.0" style="flex:1">1B</button></div>
+            <button data-action="clear_bases" style="width:100%">Clear</button></div>
+        </div>
+        <div class="cols3" style="margin-top:10px">
+          <div class="counter"><span class="lbl">Balls</span><span class="n" data-text="game.balls">0</span>
+            <div class="row nofill"><button data-inc="game.balls" data-delta="-1" data-min="0" data-max="3">-</button><button data-inc="game.balls" data-delta="1" data-min="0" data-max="3">+</button></div></div>
+          <div class="counter"><span class="lbl">Strikes</span><span class="n" data-text="game.strikes">0</span>
+            <div class="row nofill"><button data-inc="game.strikes" data-delta="-1" data-min="0" data-max="2">-</button><button data-inc="game.strikes" data-delta="1" data-min="0" data-max="2">+</button></div></div>
+          <div class="counter"><span class="lbl">Outs</span><span class="n" data-text="game.outs">0</span>
+            <div class="row nofill"><button data-inc="game.outs" data-delta="-1" data-min="0" data-max="3">-</button><button data-inc="game.outs" data-delta="1" data-min="0" data-max="3">+</button></div></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button data-action="reset_count">Next batter (clear count)</button>
+          <button class="good" data-action="next_half" data-confirm="End this half-inning? Outs, count and bases reset.">Next half-inning</button>
+        </div>
+        <div class="muted" style="margin-top:8px">Walk or strikeout: press Next batter. Third out: press Next half-inning.</div>
+      </div>
+
+      <div class="card" data-sport="volleyball">
+        <h3>Volleyball</h3>
+        <div class="row">
+          <button class="big good" data-action="end_set" data-confirm="End this set? The set score is saved and points reset to 0-0.">End set</button>
+          <button data-action="undo_set" data-confirm="Undo the last ended set?">Undo last set</button>
+        </div>
+        <div class="cols2" style="margin-top:10px">
+          <div><label class="f">Match format</label>
+            <div class="row"><button data-set="game.bestOf" data-value="3">Best of 3</button><button data-set="game.bestOf" data-value="5">Best of 5</button></div></div>
+          <div><label class="f">Current set number</label>
+            <div class="row"><button data-inc="period" data-delta="-1" data-min="1">-</button>
+              <span class="cond" style="flex:none;font-size:30px;font-weight:800;min-width:40px;text-align:center" data-text="period">1</span>
+              <button data-inc="period" data-delta="1" data-min="1">+</button></div></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Sets won are counted automatically when you press End set; fix them per team below if needed.</div>
+      </div>
+
+      <div class="card" data-sport="soccer">
+        <h3>Soccer</h3>
+        <div class="cols2">
+          <div class="counter"><span class="lbl">Added time (minutes)</span><span class="n" data-text="game.stoppage">0</span>
+            <div class="row nofill"><button data-inc="game.stoppage" data-delta="-1" data-min="0" data-max="15">-</button><button data-inc="game.stoppage" data-delta="1" data-min="0" data-max="15">+</button><button data-set="game.stoppage" data-value="0">Clear</button></div></div>
+          <div><label class="f">Period label</label>
+            <div class="row"><button data-set="periodText" data-value="HALF">HALFTIME</button><button data-set="periodText" data-value="FINAL">FINAL</button><button data-set="periodText" data-value="">Clear</button></div>
+            <div class="muted" style="margin-top:6px">Use Next period for 2nd half, then extra time.</div></div>
+        </div>
+        <label class="f" style="margin-top:14px">Penalty shootout</label>
+        <div class="row">
+          <button data-toggle="game.pens.active" id="pensBtn" style="flex:2"></button>
+          <button class="warn" data-action="pen_clear" data-confirm="Clear the penalty shootout?">Clear shootout</button>
+        </div>
+        <div class="cols2" style="margin-top:8px">
+          <div class="pens"><div class="muted" style="margin-bottom:4px" data-text="teams.home.name"></div>
+            <div class="row"><button class="good" data-action="pen_kick" data-args='{"side":"home","goal":true}'>Goal</button><button class="warn" data-action="pen_kick" data-args='{"side":"home","goal":false}'>Miss</button><button data-action="pen_undo" data-args='{"side":"home"}'>Undo</button></div></div>
+          <div class="pens"><div class="muted" style="margin-bottom:4px" data-text="teams.away.name"></div>
+            <div class="row"><button class="good" data-action="pen_kick" data-args='{"side":"away","goal":true}'>Goal</button><button class="warn" data-action="pen_kick" data-args='{"side":"away","goal":false}'>Miss</button><button data-action="pen_undo" data-args='{"side":"away"}'>Undo</button></div></div>
+        </div>
+        <div class="muted" style="margin-top:8px">Pressing Goal or Miss shows the shootout under the scorebug. Final shootout score is shown as PENS 3 - 2.</div>
+      </div>
+
+      <div class="card">
+        <h3>Game</h3>
+        <div class="row">
+          <button data-action="swap_teams" data-confirm="Swap everything between Home and Away (names, colors, logos, scores)?">Swap Home / Away</button>
+          <button class="warn" data-action="new_game" data-confirm="Start a new game? Scores, clock and counts reset. Team names, colors and logos are kept.">New game (reset scores)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TEAMS ============ -->
+    <div class="tab stack" id="tab-teams" hidden>
+      <div class="grid2" id="teamEditors"></div>
+      <div class="card">
+        <h3>Saved teams</h3>
+        <div class="muted" style="margin-bottom:10px">Save a team once (name, colors, logo) and load it as Home or Away any time.</div>
+        <div id="libList"></div>
+      </div>
+    </div>
+
+    <!-- ============ STYLE ============ -->
+    <div class="tab stack" id="tab-style" hidden>
+      <div class="card">
+        <h3>OBS output link</h3>
+        <div class="muted" style="margin-bottom:10px">In OBS add a <b>Browser Source</b>, paste this link into the URL box, and set the size to 1920 x 1080.</div>
+        <div class="row" style="flex-wrap:nowrap;gap:8px">
+          <input type="text" id="outUrl" readonly style="flex:1;min-width:0" onfocus="this.select()">
+          <button id="copyUrlBtn" style="white-space:nowrap">Copy link</button>
+        </div>
+        <div class="muted" id="outUrlNote" style="margin-top:8px"></div>
+      </div>
+      <div class="card" id="netCard">
+        <h3>Other devices (iPad, tablet)</h3>
+        <div class="muted" style="margin-bottom:10px">Use the Stat Keeper or this control panel from an iPad, phone or second computer on the same Wi-Fi or network.</div>
+        <div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">
+          <button id="netToggle" style="white-space:nowrap">Allow other devices: OFF</button>
+          <span class="muted" id="netState" style="flex:1"></span>
+        </div>
+        <div id="netOn" hidden style="margin-top:14px">
+          <div class="row" style="gap:8px;margin-bottom:10px">
+            <button id="netPickStats" class="on">Stat Keeper</button>
+            <button id="netPickCtl">Control panel</button>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+            <div id="netQr" style="background:#fff;padding:6px;border-radius:8px;line-height:0;min-width:120px;min-height:120px"></div>
+            <div style="flex:1;min-width:220px">
+              <div class="muted" style="margin-bottom:6px">On the other device, point the camera at the code, or type this address into Safari or Chrome:</div>
+              <div class="row" style="flex-wrap:nowrap;gap:8px">
+                <input type="text" id="netUrl" readonly style="flex:1;min-width:0" onfocus="this.select()">
+                <button id="netCopy" style="white-space:nowrap">Copy</button>
+              </div>
+              <div class="muted" id="netAlt" style="margin-top:8px"></div>
+            </div>
+          </div>
+          <div class="muted" style="margin-top:12px">Anyone on this network can open these pages and change your scores while this is on. Turn it off when you are done, and only use it on a network you trust.</div>
+        </div>
+        <div class="muted" id="netHelp" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h3>Scorebug style - <span id="styleSport" style="color:var(--accent)"></span></h3>
+        <div class="muted" style="margin-bottom:12px">Each sport keeps its own style settings.</div>
+        <div class="cols2">
+          <div><label class="f">Position</label>
+            <select data-path="styles.{sport}.position">
+              <option value="top-left">Top left</option><option value="top-center">Top center</option><option value="top-right">Top right</option>
+              <option value="bottom-left">Bottom left</option><option value="bottom-center">Bottom center</option><option value="bottom-right">Bottom right</option>
+            </select></div>
+          <div><label class="f">Team names show as</label>
+            <select data-path="styles.{sport}.nameMode"><option value="name">Full name</option><option value="abbr">Abbreviation</option></select></div>
+          <div><label class="f">Size <span data-text="styles.{sport}.scale" style="color:var(--text)"></span></label>
+            <input type="range" min="0.6" max="1.6" step="0.05" data-path="styles.{sport}.scale"></div>
+          <div><label class="f">Nudge (px) &nbsp; X / Y</label>
+            <div class="row" style="flex-wrap:nowrap"><input type="number" step="4" data-path="styles.{sport}.offsetX" style="min-width:0"><input type="number" step="4" data-path="styles.{sport}.offsetY" style="min-width:0"></div></div>
+          <div><label class="f">Panel color (clock / strip)</label><input type="color" data-path="styles.{sport}.panel"></div>
+          <div><label class="f">Accent color (labels, highlights)</label><input type="color" data-path="styles.{sport}.accent"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:14px"><input type="checkbox" data-path="styles.{sport}.homeFirst"> Show Home team on the left (default: Away on the left)</label>
+      </div>
+      <div class="card" data-sport="football basketball soccer">
+        <h3>Clock</h3>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-path="styles.{sport}.showClock"> Show the game clock on the scorebug <span class="muted">(uncheck to show only the period)</span></label>
+        <div class="cols2" style="margin-top:12px">
+          <div><label class="f"><span data-sport="soccer">Half length (mm:ss)</span><span data-sport="football basketball">Period length (mm:ss)</span></label><input type="text" id="periodLen" placeholder="12:00"></div>
+          <div data-sport="football basketball"><label class="f">Timeouts per team</label><input type="number" min="0" max="9" data-path="game.toMax"></div>
+          <div data-sport="soccer"><label class="f">Extra-time half (mm:ss)</label><input type="text" id="otLen" placeholder="10:00"></div>
+        </div>
+        <div data-sport="soccer" style="margin-top:12px"><label class="f">Clock runs</label>
+          <div class="seg"><button data-action="clock_dir" data-args='{"dir":1}' data-dirval="1">Up (0:00 &rarr; match time)</button><button data-action="clock_dir" data-args='{"dir":-1}' data-dirval="-1">Down (time left in half)</button></div>
+          <div class="muted" style="margin-top:6px">Up: second half starts at 2 x the half length, like a TV clock. Down: resets every half.</div></div>
+        <label data-sport="football basketball" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" data-path="clock.tenths"> Show tenths of a second under 1:00</label>
+        <div class="muted" style="margin-top:8px">Length changes apply the next time you press Reset or Next period.</div>
+      </div>
+      <div class="card" data-sport="volleyball">
+        <h3>Timeouts</h3>
+        <div style="max-width:260px"><label class="f">Timeouts per team per set</label><input type="number" min="0" max="9" data-path="game.toMax"></div>
+      </div>
+    </div>
+
+    <!-- ============ DATA ============ -->
+    <div class="tab stack" id="tab-data" hidden>
+      <div class="card">
+        <h3>Scoreboard controller (serial)</h3>
+        <div class="statusline"><span class="dot" id="serDot"></span><span id="serMsg">Not connected</span></div>
+        <div class="muted" id="serCounts" style="margin:6px 0 12px"></div>
+        <div class="notice" id="serNoPy" hidden>pyserial is not installed on this computer, so scoreboard import is unavailable. Manual mode still works.</div>
+        <div class="cols3" style="margin-top:10px">
+          <div><label class="f">Port</label><div class="row"><select id="serPort" style="flex:3"></select><button id="serRefresh" style="flex:none">&#8635;</button></div></div>
+          <div><label class="f">Baud rate</label>
+            <select id="serBaud"><option>1200</option><option>2400</option><option>4800</option><option selected>9600</option><option>19200</option><option>38400</option><option>57600</option><option>115200</option></select></div>
+          <div><label class="f">Data bits / Parity / Stop</label>
+            <div class="row" style="flex-wrap:nowrap"><select id="serBits" style="min-width:0"><option>8</option><option>7</option></select>
+              <select id="serPar" style="min-width:0"><option value="N">None</option><option value="E">Even</option><option value="O">Odd</option></select>
+              <select id="serStop" style="min-width:0"><option>1</option><option>2</option></select></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Frame &amp; field mapping</h3>
+        <div class="muted" style="margin-bottom:10px">FairPlay doesn't publish the data format, so map it yourself: change one thing on the scoreboard (e.g. add a home point) and watch which byte changes in the live monitor below. Enter that byte's position (offset, counting from 0) next to the field. Only mapped fields are imported; everything else stays manual.</div>
+        <div class="cols2">
+          <div><label class="f">Frame length (bytes)</label><input type="number" min="1" id="frameLen" placeholder="e.g. 24"></div>
+          <div><label class="f">Start marker byte (optional)</label><input type="text" id="startMark" placeholder="e.g. 0xAA or 170"></div>
+        </div>
+        <table style="margin-top:12px"><thead><tr><th>Field</th><th style="width:80px">Offset</th><th style="width:80px">Length</th><th style="width:170px">Encoding</th><th style="width:80px">Live</th></tr></thead>
+          <tbody id="mapBody"></tbody></table>
+        <div class="row" style="margin-top:12px"><button class="good" id="serSave">Save &amp; reconnect</button></div>
+      </div>
+
+      <div class="card">
+        <h3>Live monitor</h3>
+        <label class="f">Last frame (offsets shown above each byte)</label>
+        <div class="hex" id="hexFrame"><span class="muted">No complete frame yet. Set the frame length above.</span></div>
+        <label class="f" style="margin-top:12px">Raw bytes (most recent 128)</label>
+        <div class="hex" id="hexRaw"><span class="muted">Waiting for data...</span></div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div>
+      <div class="preview" id="preview"><div class="pv-scale" id="pvScale"><iframe src="/overlay.html?checker=1" title="Overlay preview"></iframe></div></div>
+      <div class="muted" style="margin-top:6px">Live preview of exactly what OBS shows.</div>
+    </div>
+    <div class="card">
+      <h3>Banner</h3>
+      <div class="row">
+        <input type="text" id="bnText" placeholder="Message, e.g. TOUCHDOWN {T}!" style="flex:3">
+        <button class="good" id="bnShow" style="flex:none">Show</button>
+        <button id="bnHide" style="flex:none">Hide</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="muted" style="flex:none">Color</span>
+        <label style="flex:none"><input type="radio" name="bnColor" value="accent" checked> Accent</label>
+        <label style="flex:none"><input type="radio" name="bnColor" value="home"> Home</label>
+        <label style="flex:none"><input type="radio" name="bnColor" value="away"> Away</label>
+        <span class="grow"></span>
+        <span class="muted" style="flex:none">Auto-hide</span>
+        <input type="number" id="bnAuto" value="6" min="0" max="60" style="width:70px;flex:none"><span class="muted" style="flex:none">sec</span>
+      </div>
+      <div class="muted" style="margin-top:6px"><code>{T}</code> becomes the selected team's name. 0 seconds = stays until hidden.</div>
+      <div class="row" id="bnPresets" style="margin-top:10px"></div>
+    </div>
+  </aside>
+</main>
+
+<script src="/config.js"></script>
+<script>
+(function () {
+'use strict';
+var $ = function (s, r) { return (r || document).querySelector(s); };
+var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+var S = null, LIB = [], SER = null, PORTS = [], ws = null, offset = 0;
+var dataDirty = false, dataInit = false;
+
+function get(path) { return path.split('.').reduce(function (o, k) { return o == null ? undefined : o[k]; }, S); }
+function resolve(p) { return S ? p.replace('{sport}', S.sport) : p; }
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function parse(v) { try { return JSON.parse(v); } catch (e) { return v; } }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function lum(h) {
+  h = String(h || '#000').replace('#', ''); var n = parseInt(h, 16) || 0;
+  var c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); });
+  return .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+}
+function contrast(h) { return lum(h) > .3 ? '#0b0e13' : '#ffffff'; }
+
+/* ---------- build dynamic markup ---------- */
+function teamCard(side) {
+  return '<div class="card tcard" data-side="' + side + '">' +
+    '<div class="thead" data-teamcolor="' + side + '"><span data-text="teams.' + side + '.name"></span><span class="tag">' + side.toUpperCase() + '</span></div>' +
+    '<div class="bigscore" data-text="teams.' + side + '.score">0</div>' +
+    '<div class="row">' +
+      ['6', '3', '2', '1'].map(function (d) { return '<button data-sport="football" data-inc="teams.' + side + '.score" data-delta="' + d + '" data-min="0">+' + d + '</button>'; }).join('') +
+      ['1', '2', '3'].map(function (d) { return '<button data-sport="basketball" data-inc="teams.' + side + '.score" data-delta="' + d + '" data-min="0">+' + d + '</button>'; }).join('') +
+      '<button data-sport="baseball volleyball soccer" data-inc="teams.' + side + '.score" data-delta="1" data-min="0">+1</button>' +
+      '<button class="warn" data-inc="teams.' + side + '.score" data-delta="-1" data-min="0">-1</button>' +
+    '</div>' +
+    '<div class="sub" data-sport="football basketball volleyball"><span class="lbl">Timeouts left</span>' +
+      '<button data-inc="teams.' + side + '.timeouts" data-delta="-1" data-min="0">-</button><span class="val" data-text="teams.' + side + '.timeouts"></span>' +
+      '<button data-inc="teams.' + side + '.timeouts" data-delta="1" data-min="0">+</button>' +
+      '<button data-sport="football basketball" data-action="timeout_use" data-args=\'{"side":"' + side + '"}\' style="flex:1">Use + stop clock</button></div>' +
+    '<div class="sub" data-sport="basketball"><span class="lbl">Team fouls</span>' +
+      '<button data-inc="teams.' + side + '.fouls" data-delta="-1" data-min="0">-</button><span class="val" data-text="teams.' + side + '.fouls"></span>' +
+      '<button data-inc="teams.' + side + '.fouls" data-delta="1" data-min="0">+</button><span class="muted">opponent is in the BONUS at 5 · resets each quarter &amp; OT</span></div>' +
+    ['yellow', 'red'].map(function (k) {
+      return '<div class="sub" data-sport="soccer"><span class="lbl">' + (k === 'yellow' ? 'Yellow cards' : 'Red cards') + '</span>' +
+        '<button data-inc="game.cards.' + side + '.' + k + '" data-delta="-1" data-min="0">-</button><span class="val" data-text="game.cards.' + side + '.' + k + '"></span>' +
+        '<button data-inc="game.cards.' + side + '.' + k + '" data-delta="1" data-min="0" data-max="4">+</button></div>';
+    }).join('') +
+    '<div class="sub" data-sport="volleyball"><span class="lbl">Sets won</span>' +
+      '<button data-inc="game.sets.' + side + '" data-delta="-1" data-min="0">-</button><span class="val" data-text="game.sets.' + side + '"></span>' +
+      '<button data-inc="game.sets.' + side + '" data-delta="1" data-min="0">+</button></div>' +
+    '<div class="sub" data-sport="football basketball volleyball"><span class="lbl">' +
+      '<span data-sport="football">Possession</span><span data-sport="basketball">Poss. arrow</span><span data-sport="volleyball">Serving</span></span>' +
+      '<button data-set="game.possession" data-value="' + side + '" data-clearsame="1" style="flex:1">Toggle</button></div>' +
+  '</div>';
+}
+
+function teamEditor(side) {
+  return '<div class="card"><h3>' + side + ' team</h3><div class="stack" style="gap:10px">' +
+    '<div><label class="f">Name</label><input type="text" data-path="teams.' + side + '.name" maxlength="28"></div>' +
+    '<div class="cols2"><div><label class="f">Abbreviation</label><input type="text" data-path="teams.' + side + '.abbr" maxlength="5"></div>' +
+      '<div><label class="f">Record (optional)</label><input type="text" data-path="teams.' + side + '.record" maxlength="12" placeholder="5-2"></div></div>' +
+    '<div class="row nofill" style="gap:18px"><div><label class="f">Main color</label><input type="color" data-path="teams.' + side + '.color"></div>' +
+      '<div><label class="f">Score box color</label><input type="color" data-path="teams.' + side + '.color2"></div></div>' +
+    '<div><label class="f">Logo</label><div class="row nofill" style="align-items:flex-start">' +
+      '<div class="logobox"><img data-logo="' + side + '" alt="" hidden></div>' +
+      '<div class="stack" style="gap:8px;flex:1">' +
+        '<div class="row"><button data-upload="' + side + '">Upload logo...</button><button class="warn" data-set="teams.' + side + '.logo" data-value="">Remove</button></div>' +
+        '<select data-path="teams.' + side + '.logoPlate"><option value="none">No backing</option><option value="white">White circle behind logo</option><option value="dark">Dark circle behind logo</option></select>' +
+        '<input type="file" accept="image/*" data-file="' + side + '" hidden>' +
+      '</div></div><div class="muted" style="margin-top:6px">PNG with a transparent background works best.</div></div>' +
+    '<button data-teamsave="' + side + '">Save to saved teams</button>' +
+  '</div></div>';
+}
+
+$('#scoreRow').innerHTML = teamCard('away') + teamCard('home');
+$('#teamEditors').innerHTML = teamEditor('home') + teamEditor('away');
+
+var PRESETS = {
+  football: ['TOUCHDOWN {T}!', 'FIELD GOAL', 'EXTRA POINT GOOD', 'FLAG ON THE PLAY', 'TIMEOUT {T}', 'TURNOVER', 'END OF QUARTER', 'HALFTIME', 'FINAL'],
+  basketball: ['THREE POINTER! {T}', 'DUNK! {T}', 'TIMEOUT {T}', 'FOUL', 'BONUS: {T}', 'END OF QUARTER', 'HALFTIME', 'OVERTIME', 'FINAL'],
+  baseball: ['HOME RUN! {T}', 'PITCHING CHANGE', 'END OF INNING', 'RAIN DELAY', 'FINAL'],
+  volleyball: ['SET POINT', 'MATCH POINT', 'TIMEOUT {T}', 'SET WON: {T}', 'FINAL'],
+  soccer: ['GOAL! {T}', 'YELLOW CARD', 'RED CARD', 'PENALTY KICK', 'SUBSTITUTION', 'HALFTIME', 'EXTRA TIME', 'PENALTY SHOOTOUT', 'FINAL']
+};
+function renderPresets() {
+  var el = $('#bnPresets'), sp = S.sport;
+  if (el.dataset.sport === sp) return;
+  el.dataset.sport = sp;
+  el.innerHTML = PRESETS[sp].map(function (t) { return '<button data-preset="' + esc(t) + '" style="flex:none">' + esc(t) + '</button>'; }).join('');
+}
+function bannerColor() {
+  var v = ($('input[name=bnColor]:checked') || {}).value;
+  return v === 'home' ? S.teams.home.color : v === 'away' ? S.teams.away.color : '';
+}
+function bannerTeamName() {
+  var v = ($('input[name=bnColor]:checked') || {}).value;
+  return v === 'home' ? S.teams.home.name : v === 'away' ? S.teams.away.name : '';
+}
+function showBanner(text) {
+  text = text.replace(/\{T\}/g, bannerTeamName()).replace(/\{HOME\}/gi, S.teams.home.name).replace(/\{AWAY\}/gi, S.teams.away.name).replace(/\s+([!?.])/g, '$1').trim();
+  send({ type: 'action', name: 'banner_show', args: { text: text, color: bannerColor(), autoHide: Number($('#bnAuto').value) || 0 } });
+}
+
+/* ---------- refresh from state ---------- */
+function refresh() {
+  if (!S) return;
+  var sp = S.sport;
+  $$('[data-path]').forEach(function (el) {
+    if (el === document.activeElement) return;
+    var v = get(resolve(el.dataset.path)); if (v === undefined) return;
+    if (el.type === 'checkbox') el.checked = !!v;
+    else if (String(el.value) !== String(v)) el.value = v;
+  });
+  $$('[data-text]').forEach(function (el) {
+    var v = get(resolve(el.dataset.text)); if (v !== undefined) el.textContent = v;
+  });
+  $$('[data-sport]').forEach(function (el) { el.hidden = el.dataset.sport.split(' ').indexOf(sp) < 0; });
+  $$('[data-teamcolor]').forEach(function (el) {
+    var t = S.teams[el.dataset.teamcolor]; el.style.background = t.color; el.style.color = contrast(t.color);
+  });
+  $$('button[data-set]').forEach(function (b) { b.classList.toggle('on', b.dataset.value !== '' && String(get(resolve(b.dataset.set))) === b.dataset.value); });
+  $$('button[data-toggle]').forEach(function (b) { b.classList.toggle('on', !!get(resolve(b.dataset.toggle))); });
+  var scb = $('#showClockBtn'); if (scb) { var shown = S.styles[sp].showClock !== false; scb.textContent = shown ? 'Clock is SHOWN on scorebug - tap to hide' : 'Clock is HIDDEN on scorebug - tap to show'; scb.classList.toggle('on', !shown); }
+  var pb = $('#pensBtn'); if (pb) { pb.textContent = S.game.pens && S.game.pens.active ? 'Shootout is SHOWN - tap to hide' : 'Show penalty shootout'; pb.classList.toggle('on', !!(S.game.pens && S.game.pens.active)); }
+  $$('button[data-dirval]').forEach(function (b) { b.classList.toggle('on', Number(b.dataset.dirval) === S.clock.dir); });
+  $$('#sportSeg button').forEach(function (b) { b.classList.toggle('on', parse(b.dataset.args).sport === sp); });
+  $$('#srcSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.source === S.source); });
+  $('#srcNote').textContent = S.source === 'serial' ? 'Mapped fields follow the scoreboard; others stay manual.' : '';
+  var sb = $('#showBtn'); sb.textContent = S.visible ? 'HIDE SCOREBUG' : 'SHOW SCOREBUG';
+  sb.className = 'big ' + (S.visible ? 'warn' : 'good');
+  $$('[data-logo]').forEach(function (img) {
+    var l = S.teams[img.dataset.logo].logo; img.hidden = !l; if (l && img.getAttribute('src') !== l) img.src = l;
+  });
+  $('#scoreRow').children[0].style.order = S.styles[sp].homeFirst ? 2 : 1;
+  $('#scoreRow').children[1].style.order = S.styles[sp].homeFirst ? 1 : 2;
+  $('#styleSport').textContent = sp.toUpperCase();
+  var pl = $('#periodLen'); if (pl && pl !== document.activeElement) pl.value = fmtMs(S.clock.periodMs);
+  var ol = $('#otLen'); if (ol && ol !== document.activeElement) ol.value = fmtMs(S.clock.otMs || S.clock.periodMs);
+  $('#periodShow').textContent = S.periodText || (sp === 'soccer' ? (S.period <= 4 ? ['1ST', '2ND', 'ET 1', 'ET 2'][S.period - 1] : 'PENS') : S.period <= 4 ? ['1ST', '2ND', '3RD', '4TH'][S.period - 1] : (S.period === 5 ? 'OT' : (S.period - 4) + 'OT'));
+  $('#clockToggle').className = 'big ' + (S.clock.running ? 'warn' : 'good');
+  renderPresets();
+}
+function fmtMs(ms) { var s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+function parseClock(str) {
+  str = String(str).trim(); var m;
+  if ((m = str.match(/^(\d+):(\d{1,2})(?:\.(\d))?$/))) return (+m[1] * 60 + +m[2]) * 1000 + (m[3] ? +m[3] * 100 : 0);
+  if ((m = str.match(/^(\d+)(?:\.(\d))?$/))) return +m[1] * 1000 + (m[2] ? +m[2] * 100 : 0);
+  return null;
+}
+function renderLibrary() {
+  var el = $('#libList');
+  if (!LIB.length) { el.innerHTML = '<div class="muted">No saved teams yet. Set up a team, then press "Save to saved teams".</div>'; return; }
+  el.innerHTML = LIB.map(function (t) {
+    return '<div class="lib"><span class="chip" style="background:linear-gradient(' + t.color + ' 50%,' + t.color2 + ' 50%)"></span>' +
+      (t.logo ? '<img src="' + t.logo + '" alt="">' : '') + '<span class="nm">' + esc(t.name) + '</span>' +
+      '<button data-libload="' + t.id + '" data-side="home">Use as Home</button><button data-libload="' + t.id + '" data-side="away">Use as Away</button>' +
+      '<button class="warn" data-libdel="' + t.id + '">&#10005;</button></div>';
+  }).join('');
+}
+
+/* ---------- clock readout ---------- */
+function tick() {
+  if (S && !$('#clockRead').closest('[hidden]')) {
+    var c = S.clock, ms = c.running ? Math.max(0, c.ms + c.dir * (Date.now() + offset - c.anchor)) : c.ms, t;
+    if (c.tenths && ms < 60000) { var q = Math.floor(ms / 100); t = Math.floor(q / 10) + '.' + (q % 10); }
+    else { var s = c.dir > 0 ? Math.floor(ms / 1000) : Math.ceil(ms / 1000); t = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+    var r = $('#clockRead'); if (r.textContent !== t) r.textContent = t; r.classList.toggle('running', c.running);
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------- scoreboard (serial) tab ---------- */
+var MAPCOLORS = 6, MAPCOL = ['#2f6fd6', '#1f9d55', '#c07a12', '#a23fb8', '#188a95', '#b8423f'];
+function buildMapTable(targets, fields) {
+  var tb = $('#mapBody'); if (tb.dataset.built) return; tb.dataset.built = '1';
+  tb.innerHTML = targets.map(function (t, i) {
+    var f = fields[t[0]] || {};
+    return '<tr data-field="' + t[0] + '"><td><span style="display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:8px;vertical-align:middle;background:' + MAPCOL[i % MAPCOLORS] + '"></span>' + esc(t[1]) + '</td>' +
+      '<td><input type="number" min="0" class="mo" value="' + (f.offset == null ? '' : f.offset) + '"></td>' +
+      '<td><input type="number" min="1" class="ml" value="' + (f.length || 1) + '"></td>' +
+      '<td><select class="me"><option value="raw_int">Binary number</option><option value="bcd">BCD (0x23 = 23)</option><option value="ascii_digit">ASCII digits</option></select></td>' +
+      '<td class="live" id="live_' + t[0] + '">-</td></tr>';
+  }).join('');
+  targets.forEach(function (t) { var f = fields[t[0]]; if (f && f.encoding) $('tr[data-field="' + t[0] + '"] .me').value = f.encoding; });
+}
+function mappedOffsets() {
+  var map = {};
+  $$('#mapBody tr').forEach(function (tr, i) {
+    var o = tr.querySelector('.mo').value; if (o === '') return;
+    var len = Number(tr.querySelector('.ml').value) || 1;
+    for (var k = 0; k < len; k++) map[Number(o) + k] = i % MAPCOLORS;
+  });
+  return map;
+}
+function hexGrid(hex, mapped, withIdx) {
+  var bytes = hex ? hex.split(' ') : [], out = '';
+  for (var i = 0; i < bytes.length; i += 16) {
+    var row = bytes.slice(i, i + 16);
+    if (withIdx) out += '<div class="hrow idx">' + row.map(function (_, k) { return '<span class="b">' + ('0' + (i + k).toString(16).toUpperCase()).slice(-2) + '</span>'; }).join('') + '</div>';
+    out += '<div class="hrow">' + row.map(function (b, k) {
+      var cls = mapped && mapped[i + k] !== undefined ? ' m' + mapped[i + k] : '';
+      return '<span class="b' + cls + '">' + b + '</span>';
+    }).join('') + '</div>';
+  }
+  return out;
+}
+function renderPorts() {
+  var sel = $('#serPort'), cur = (SER && SER.config.serial.port) || sel.value;
+  var opts = PORTS.map(function (p) { return '<option value="' + esc(p.device) + '">' + esc(p.device + (p.description && p.description !== 'n/a' ? ' - ' + p.description : '')) + '</option>'; });
+  if (cur && !PORTS.some(function (p) { return p.device === cur; })) opts.unshift('<option value="' + esc(cur) + '">' + esc(cur) + ' (not detected)</option>');
+  sel.innerHTML = '<option value="">- select a port -</option>' + opts.join('');
+  sel.value = cur || '';
+}
+function renderSerial() {
+  if (!SER) return;
+  var st = SER.status, cfg = SER.config;
+  $('#serNoPy').hidden = SER.available;
+  $('#serDot').className = 'dot' + (st.state === 'connected' ? ' ok' : '');
+  $('#serMsg').textContent = st.message || (st.state === 'idle' ? 'No serial port selected' : st.state);
+  $('#serCounts').textContent = st.state === 'connected' ? (st.bytes + ' bytes received, ' + st.frames + ' frames decoded') : '';
+  buildMapTable(SER.targets, cfg.protocol.fields || {});
+  if (!dataInit || !dataDirty) {
+    if (!dataDirty) {
+      $('#serBaud').value = cfg.serial.baud; $('#serBits').value = cfg.serial.bytesize;
+      $('#serPar').value = cfg.serial.parity; $('#serStop').value = cfg.serial.stopbits;
+      $('#frameLen').value = cfg.protocol.frame_length == null ? '' : cfg.protocol.frame_length;
+      $('#startMark').value = cfg.protocol.start_marker == null ? '' : '0x' + cfg.protocol.start_marker.toString(16).toUpperCase();
+      renderPorts();
+    }
+    dataInit = true;
+  }
+  SER.targets.forEach(function (t) { var el = $('#live_' + t[0]); if (el) el.textContent = SER.values[t[0]] === undefined ? '-' : SER.values[t[0]]; });
+  if ($('#tab-data').hidden) return;
+  var mapped = mappedOffsets();
+  $('#hexFrame').innerHTML = st.lastFrame ? hexGrid(st.lastFrame, mapped, true) : '<span class="muted">No complete frame yet. Set the frame length above.</span>';
+  $('#hexRaw').innerHTML = st.raw ? hexGrid(st.raw, null, false) : '<span class="muted">Waiting for data...</span>';
+}
+function parseMarker(s) {
+  s = String(s).trim(); if (!s) return null;
+  if (/^0x/i.test(s)) return parseInt(s, 16);
+  if (/^[0-9a-f]{2}$/i.test(s) && /[a-f]/i.test(s)) return parseInt(s, 16);
+  var n = parseInt(s, 10); return isNaN(n) ? null : n;
+}
+function saveSerial() {
+  var fields = {};
+  $$('#mapBody tr').forEach(function (tr) {
+    fields[tr.dataset.field] = { offset: tr.querySelector('.mo').value, length: tr.querySelector('.ml').value, encoding: tr.querySelector('.me').value };
+  });
+  send({ type: 'serial_config',
+    serial: { port: $('#serPort').value, baud: $('#serBaud').value, bytesize: $('#serBits').value, parity: $('#serPar').value, stopbits: $('#serStop').value },
+    protocol: { frame_length: $('#frameLen').value, start_marker: parseMarker($('#startMark').value), fields: fields } });
+  dataDirty = false;
+}
+
+/* ---------- events ---------- */
+var timers = {}, pending = {};
+function sendSet(path, value) {
+  if (timers[path]) { pending[path] = value; return; }
+  send({ type: 'set', path: path, value: value });
+  timers[path] = setTimeout(function () {
+    delete timers[path];
+    if (path in pending) { var v = pending[path]; delete pending[path]; sendSet(path, v); }
+  }, 45);
+}
+document.addEventListener('input', function (e) {
+  var el = e.target;
+  if (el.closest('#tab-data')) { dataDirty = true; return; }
+  if (!el.dataset.path) return;
+  var v;
+  if (el.type === 'checkbox') v = el.checked;
+  else if (el.type === 'number' || el.type === 'range') { if (el.value === '') return; v = Number(el.value); }
+  else v = el.value;
+  sendSet(resolve(el.dataset.path), v);
+});
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.id === 'otLen') { var oms = parseClock(el.value); if (oms != null) send({ type: 'set', path: 'clock.otMs', value: oms }); else el.value = fmtMs(S.clock.otMs); }
+  if (el.id === 'periodLen') { var ms = parseClock(el.value); if (ms != null) send({ type: 'set', path: 'clock.periodMs', value: ms }); else el.value = fmtMs(S.clock.periodMs); }
+  if (el.dataset.file) { if (el.files[0]) loadLogo(el.dataset.file, el.files[0]); el.value = ''; }
+});
+document.addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var d = b.dataset;
+  if (d.confirm && !confirm(d.confirm)) return;
+  if (d.tab) { showTab(d.tab); return; }
+  if (d.source) { send({ type: 'source', value: d.source }); return; }
+  if (d.inc) {
+    send({ type: 'inc', path: resolve(d.inc), delta: Number(d.delta), min: d.min === undefined ? null : Number(d.min), max: d.max === undefined ? null : Number(d.max) });
+  } else if (d.sets) {
+    parse(d.sets).forEach(function (p) { send({ type: 'set', path: p[0], value: p[1] }); });
+  } else if (d.set !== undefined) {
+    var path = resolve(d.set), val = parse(d.value);
+    if (d.clearsame && String(get(path)) === d.value) val = '';
+    send({ type: 'set', path: path, value: val });
+  } else if (d.toggle) {
+    send({ type: 'set', path: resolve(d.toggle), value: !get(resolve(d.toggle)) });
+  } else if (d.action) {
+    send({ type: 'action', name: d.action, args: d.args ? parse(d.args) : {} });
+  } else if (d.upload) {
+    $('input[data-file="' + d.upload + '"]').click();
+  } else if (d.teamsave) {
+    send({ type: 'team_save', side: d.teamsave });
+  } else if (d.libload) {
+    send({ type: 'team_load', id: d.libload, side: d.side });
+  } else if (d.libdel) {
+    if (confirm('Delete this saved team?')) send({ type: 'team_delete', id: d.libdel });
+  } else if (d.preset) {
+    showBanner(d.preset);
+  } else if (b.id === 'showBtn') {
+    send({ type: 'set', path: 'visible', value: !S.visible });
+  } else if (b.id === 'clockToggle') {
+    send({ type: 'action', name: 'clock_toggle' });
+  } else if (b.id === 'clockSetBtn') {
+    var ms = parseClock($('#clockSet').value);
+    if (ms == null) { alert('Enter the time like 8:42 or 0:45.3'); return; }
+    send({ type: 'action', name: 'clock_set', args: { ms: ms } }); $('#clockSet').value = '';
+  } else if (b.id === 'bnShow') {
+    showBanner($('#bnText').value);
+  } else if (b.id === 'bnHide') {
+    send({ type: 'action', name: 'banner_hide' });
+  } else if (b.id === 'serRefresh') {
+    send({ type: 'ports' });
+  } else if (b.id === 'serSave') {
+    saveSerial();
+  }
+});
+$('#clockSet').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#clockSetBtn').click(); });
+$('#bnText').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#bnShow').click(); });
+document.addEventListener('keydown', function (e) {
+  if (e.code === 'Space' && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(document.activeElement.tagName) && S && (S.sport === 'football' || S.sport === 'basketball' || S.sport === 'soccer')) {
+    e.preventDefault(); send({ type: 'action', name: 'clock_toggle' });
+  }
+});
+
+function loadLogo(side, file) {
+  var url = URL.createObjectURL(file), img = new Image();
+  img.onload = function () {
+    var MAX = 320, w = img.naturalWidth || MAX, h = img.naturalHeight || MAX, k = Math.min(1, MAX / Math.max(w, h));
+    w = Math.max(1, Math.round(w * k)); h = Math.max(1, Math.round(h * k));
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    send({ type: 'set', path: 'teams.' + side + '.logo', value: c.toDataURL('image/png') });
+    URL.revokeObjectURL(url);
+  };
+  img.onerror = function () { alert('That file could not be read as an image.'); };
+  img.src = url;
+}
+
+function showTab(name) {
+  $$('.tab').forEach(function (t) { t.hidden = t.id !== 'tab-' + name; });
+  $$('#tabs button').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === name); });
+  try { localStorage.setItem('sbtab', name); } catch (x) {}
+  if (name === 'data') { send({ type: 'ports' }); renderSerial(); }
+  if (S) refresh();
+}
+
+/* preview scaling */
+function fitPreview() { var w = $('#preview').clientWidth; $('#pvScale').style.transform = 'scale(' + (w / 1920) + ')'; }
+if (window.ResizeObserver) new ResizeObserver(fitPreview).observe($('#preview')); addEventListener('resize', fitPreview); fitPreview();
+
+/* ---------- connection ---------- */
+function connect() {
+  // ---- Other devices: allow, address and QR code ----
+  if (!window.__netInit) (function () {
+    window.__netInit = true;
+    var tog = $('#netToggle'), stEl = $('#netState'), on = $('#netOn'), help = $('#netHelp'), urlEl = $('#netUrl'),
+        copyB = $('#netCopy'), qrEl = $('#netQr'), alt = $('#netAlt'), pStats = $('#netPickStats'), pCtl = $('#netPickCtl');
+    var info = null, page = 'stats.html', ipIx = 0, ct;
+    function addr() { return info && info.ips && info.ips.length ? info.ips[ipIx] : ''; }
+    function link() { var a = addr(); return a ? 'http://' + a + ':' + info.httpPort + '/' + page : ''; }
+    function draw() {
+      if (!info) return;
+      tog.textContent = 'Allow other devices: ' + (info.enabled ? 'ON' : 'OFF');
+      tog.classList.toggle('on', !!info.enabled);
+      tog.disabled = !info.local;
+      on.hidden = !info.enabled;
+      stEl.textContent = !info.local ? 'Only the computer running Scorebug Studio can change this.' : info.enabled ? 'Other devices can connect.' : 'Only this computer can connect.';
+      help.textContent = info.enabled ? 'Cannot connect? Check the device is on the same Wi-Fi, and allow Scorebug Studio through the firewall (Windows: choose Private networks).' : '';
+      var u = link(); urlEl.value = u;
+      pStats.classList.toggle('on', page === 'stats.html'); pCtl.classList.toggle('on', page !== 'stats.html');
+      qrEl.innerHTML = '';
+      if (info.enabled && u && window.qrcode) {
+        try { var q = window.qrcode(0, 'M'); q.addData(u); q.make(); qrEl.innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: false }); } catch (e) { }
+      } else if (info.enabled && !u) qrEl.textContent = '';
+      alt.textContent = info.enabled && !u ? 'Could not find this computer\u2019s network address. Check that it is connected to Wi-Fi or Ethernet.' :
+        (info.ips && info.ips.length > 1 ? 'This computer has several network addresses (' + info.ips.join(', ') + '). If this one does not work, ' : '');
+      var nx = $('#netNext'); if (nx) nx.remove();
+      if (info.enabled && info.ips && info.ips.length > 1) {
+        nx = document.createElement('button'); nx.id = 'netNext'; nx.textContent = 'try the next address'; nx.style.marginLeft = '6px';
+        nx.addEventListener('click', function () { ipIx = (ipIx + 1) % info.ips.length; draw(); });
+        alt.appendChild(nx);
+      }
+    }
+    function load(opts) {
+      fetch('/api/network', opts).then(function (r) { return r.json(); }).then(function (j) { info = j; draw(); }).catch(function () { stEl.textContent = 'Could not read network settings.'; });
+    }
+    tog.addEventListener('click', function () {
+      if (!info || !info.local) return;
+      load({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: !info.enabled }) });
+    });
+    pStats.addEventListener('click', function () { page = 'stats.html'; draw(); });
+    pCtl.addEventListener('click', function () { page = 'control.html'; draw(); });
+    copyB.addEventListener('click', function () {
+      var u = link(), self = this;
+      function done(ok) { self.textContent = ok ? 'Copied \u2713' : 'Press Ctrl/Cmd+C'; clearTimeout(ct); ct = setTimeout(function () { self.textContent = 'Copy'; }, 2000); }
+      function fb() { urlEl.focus(); urlEl.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) { } done(ok); }
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(u).then(function () { done(true); }, fb); else fb();
+    });
+    var tb = document.querySelector('[data-tab="style"]'); if (tb) tb.addEventListener('click', function () { load(); });
+    load();
+  })();
+
+  // ---- OBS output link: show and copy ----
+  if (!window.__outUrlInit) (function () {
+    window.__outUrlInit = true;
+    var url = location.origin + '/overlay.html', inp = $('#outUrl'), btn = $('#copyUrlBtn'), note = $('#outUrlNote');
+    inp.value = url;
+    if (/^(localhost|127\.)/.test(location.hostname)) note.textContent = 'This link works for OBS on this computer. For OBS on a different computer, open this control panel using this computer\u2019s network address instead (see the README), then copy the link.';
+    var t;
+    function done(ok) {
+      btn.textContent = ok ? 'Copied \u2713' : 'Press Ctrl/Cmd+C';
+      btn.classList.toggle('on', ok);
+      clearTimeout(t); t = setTimeout(function () { btn.textContent = 'Copy link'; btn.classList.remove('on'); }, 2200);
+    }
+    btn.addEventListener('click', function () {
+      function fallback() {
+        inp.focus(); inp.select(); inp.setSelectionRange(0, 999);
+        var ok = false; try { ok = document.execCommand('copy'); } catch (e) { }
+        done(ok);
+      }
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(url).then(function () { done(true); }, fallback);
+      else fallback();
+    });
+  })();
+  ws = new WebSocket('ws://' + location.hostname + ':' + window.SCOREBUG.wsPort);
+  ws.onopen = function () { $('#conn').classList.add('ok'); ws.send(JSON.stringify({ type: 'hello', role: 'control' })); };
+  ws.onmessage = function (e) {
+    var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+    if (m.type === 'state') { offset = m.t - Date.now(); S = m.state; refresh(); }
+    else if (m.type === 'library') { LIB = m.teams; renderLibrary(); }
+    else if (m.type === 'serial') { SER = m; renderSerial(); }
+    else if (m.type === 'ports') { PORTS = m.ports; renderPorts(); }
+    else if (m.type === 'error') { alert(m.message); }
+  };
+  ws.onclose = function () { $('#conn').classList.remove('ok'); setTimeout(connect, 1500); };
+  ws.onerror = function () { try { ws.close(); } catch (x) {} };
+}
+var startTab = 'live'; try { startTab = localStorage.getItem('sbtab') || 'live'; } catch (x) {}
+showTab(startTab);
+connect();
+})();
+</script>
+</body>
+</html>

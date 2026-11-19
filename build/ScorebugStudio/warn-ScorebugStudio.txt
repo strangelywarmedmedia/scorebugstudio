@@ -1,0 +1,61 @@
+
+This file lists modules PyInstaller was not able to find. This does not
+necessarily mean these modules are required for running your program. Both
+Python's standard library and 3rd-party Python packages often conditionally
+import optional modules, some of which may be available only on certain
+platforms.
+
+Types of import:
+* top-level: imported at the top-level - look at these first
+* conditional: imported within an if-statement
+* delayed: imported within a function
+* optional: imported within a try-except-statement
+
+IMPORTANT: Do NOT post this list to the issue-tracker. Use it as a basis for
+            tracking down the missing module yourself. Thanks!
+
+missing module named _winapi - imported by shutil (conditional), ntpath (optional), pathlib._os (optional), mimetypes (optional), subprocess (conditional), multiprocessing.connection (optional), multiprocessing.spawn (delayed, conditional), multiprocessing.reduction (conditional), multiprocessing.shared_memory (conditional), multiprocessing.heap (conditional), sysconfig (delayed), multiprocessing.popen_spawn_win32 (top-level), asyncio.windows_events (top-level), asyncio.windows_utils (top-level)
+missing module named msvcrt - imported by subprocess (optional), multiprocessing.spawn (delayed, conditional), multiprocessing.popen_spawn_win32 (top-level), asyncio.windows_events (top-level), asyncio.windows_utils (top-level), serial.tools.miniterm (conditional)
+missing module named winreg - imported by importlib._bootstrap_external (conditional), mimetypes (optional), urllib.request (delayed, conditional, optional), platform (delayed, optional)
+missing module named nt - imported by shutil (conditional), importlib._bootstrap_external (conditional), ntpath (optional), os (delayed, conditional, optional), _colorize (delayed, conditional, optional), ctypes (delayed, conditional)
+missing module named _frozen_importlib_external - imported by importlib._bootstrap (delayed), importlib (optional), importlib.abc (optional), zipimport (top-level)
+excluded module named _frozen_importlib - imported by importlib (optional), importlib.abc (optional), zipimport (top-level)
+missing module named 'collections.abc' - imported by selectors (top-level), http.client (top-level), traceback (top-level), importlib.resources.readers (top-level), importlib.resources.abc (top-level), logging (top-level), importlib.metadata (top-level), importlib.metadata._meta (top-level), importlib.metadata._functools (top-level), inspect (top-level), tracemalloc (top-level), _colorize (top-level), typing (top-level), asyncio.base_events (top-level), multiprocessing.managers (top-level), asyncio.coroutines (top-level), websockets.imports (top-level), websockets.asyncio.client (top-level), websockets.client (top-level), websockets.datastructures (top-level), websockets.frames (top-level), websockets.extensions.base (top-level), websockets.http11 (top-level), websockets.headers (top-level), websockets.protocol (top-level), websockets.streams (top-level), websockets.extensions.permessage_deflate (top-level), websockets.asyncio.connection (top-level), websockets.asyncio.messages (top-level), websockets.asyncio.server (top-level), websockets.server (top-level), PyObjCTools.KeyValueCoding (top-level), objc._convenience_nsdictionary (top-level), objc._convenience_mapping (top-level), objc._convenience_nsset (top-level), objc._convenience_nsarray (top-level), objc._bridges (top-level), objc._properties (top-level), xml.etree.ElementTree (top-level), objc._pycoder (top-level), PIL.Image (top-level), PIL._typing (top-level), PIL.TiffImagePlugin (top-level), PIL.GimpGradientFile (conditional), PIL.ImagePalette (conditional), PIL.ImageOps (conditional), PIL.ImageFilter (conditional), PIL.ImageQt (conditional), PIL.ImageSequence (conditional), PIL.PngImagePlugin (conditional), websockets.legacy.auth (top-level), websockets.legacy.server (top-level), websockets.legacy.protocol (top-level), websockets.legacy.framing (top-level), websockets.legacy.client (top-level), websockets.sync.client (top-level), websockets.sync.connection (top-level), websockets.sync.server (top-level), websockets.trio.client (top-level), websockets.trio.connection (top-level), websockets.trio.messages (top-level), websockets.trio.server (top-level), PIL.Jpeg2KImagePlugin (conditional)
+missing module named multiprocessing.BufferTooShort - imported by multiprocessing (top-level), multiprocessing.connection (top-level)
+missing module named multiprocessing.AuthenticationError - imported by multiprocessing (top-level), multiprocessing.forkserver (top-level), multiprocessing.connection (top-level)
+missing module named multiprocessing.get_context - imported by multiprocessing (top-level), multiprocessing.pool (top-level), multiprocessing.managers (top-level), multiprocessing.sharedctypes (top-level)
+missing module named multiprocessing.TimeoutError - imported by multiprocessing (top-level), multiprocessing.pool (top-level)
+missing module named multiprocessing.set_start_method - imported by multiprocessing (top-level), multiprocessing.spawn (top-level)
+missing module named multiprocessing.get_start_method - imported by multiprocessing (top-level), multiprocessing.spawn (top-level)
+missing module named pyimod02_importers - imported by /Library/Frameworks/Python.framework/Versions/3.15/lib/python3.15/site-packages/PyInstaller/hooks/rthooks/pyi_rth_pkgutil.py (delayed)
+runtime module named six.moves - imported by pystray._base (top-level), pystray._win32 (top-level), pystray._xorg (top-level)
+missing module named 'Xlib.XK' - imported by pystray._xorg (top-level)
+missing module named 'Xlib.threaded' - imported by pystray._xorg (top-level)
+missing module named Xlib - imported by pystray._xorg (top-level)
+missing module named StringIO - imported by six (conditional)
+missing module named 'gi.repository' - imported by pystray._appindicator (top-level), pystray._util.gtk (top-level), pystray._util.notify_dbus (top-level), pystray._gtk (top-level)
+missing module named gi - imported by pystray._appindicator (top-level), pystray._util.gtk (top-level), pystray._util.notify_dbus (top-level), pystray._gtk (top-level)
+missing module named objc.nosuchclass_error - imported by objc (top-level), objc._lazyimport (top-level)
+missing module named objc.loadBundle - imported by objc (top-level), objc._lazyimport (top-level)
+missing module named objc.getClassList - imported by objc (top-level), objc._lazyimport (top-level)
+missing module named objc.NULL - imported by objc (top-level), objc._properties (top-level)
+missing module named objc._C_BOOL - imported by objc (top-level), objc._properties (top-level)
+missing module named trio - imported by websockets.trio.client (top-level), websockets.trio.connection (top-level), websockets.trio.messages (top-level), websockets.trio.utils (top-level), websockets.trio.router (top-level), websockets.trio.server (top-level)
+missing module named 'trio.abc' - imported by websockets.trio.connection (top-level), websockets.trio.server (top-level)
+missing module named 'werkzeug.routing' - imported by websockets.asyncio.router (optional), websockets.sync.router (optional), websockets.trio.router (optional)
+missing module named 'werkzeug.exceptions' - imported by websockets.sync.router (optional), websockets.trio.router (optional)
+missing module named vms_lib - imported by platform (delayed, optional)
+missing module named _wmi - imported by platform (optional)
+missing module named 'python_socks.async_' - imported by websockets.asyncio.client (optional), websockets.trio.client (optional)
+missing module named python_socks - imported by websockets.asyncio.client (optional), websockets.sync.client (optional), websockets.trio.client (optional)
+missing module named 'python_socks.sync' - imported by websockets.sync.client (optional)
+missing module named werkzeug - imported by websockets.asyncio.router (optional)
+missing module named urlparse - imported by serial.rfc2217 (optional), serial.urlhandler.protocol_alt (optional), serial.urlhandler.protocol_cp2110 (optional), serial.urlhandler.protocol_loop (optional), serial.urlhandler.protocol_socket (optional), serial.urlhandler.protocol_spy (optional)
+missing module named Queue - imported by serial.rfc2217 (optional), serial.urlhandler.protocol_cp2110 (optional), serial.urlhandler.protocol_loop (optional)
+missing module named hid - imported by serial.urlhandler.protocol_cp2110 (top-level)
+missing module named 'System.IO' - imported by serial.serialcli (top-level)
+missing module named System - imported by serial.serialcli (top-level)
+missing module named olefile - imported by PIL.FpxImagePlugin (top-level), PIL.MicImagePlugin (top-level)
+missing module named defusedxml - imported by PIL.Image (delayed, optional)
+missing module named numpy - imported by PIL._typing (conditional, optional)
+missing module named _overlapped - imported by asyncio.windows_events (top-level)
